@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Medicine Box">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#E1F5EE">
+<title>Medicine Box</title>
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiByeD0iMTE1IiBmaWxsPSIjRTFGNUVFIi8+CjxjaXJjbGUgY3g9IjI1NiIgY3k9IjIzMCIgcj0iMTQwIiBmaWxsPSIjRTFGNUVFIiBvcGFjaXR5PSIwLjUiLz4KPHJlY3QgeD0iMTI4IiB5PSIxNDgiIHdpZHRoPSIyNTYiIGhlaWdodD0iMjAwIiByeD0iMjAiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iIzlGRTFDQiIgc3Ryb2tlLXdpZHRoPSIzIi8+CjxyZWN0IHg9IjEyOCIgeT0iMTA4IiB3aWR0aD0iMjU2IiBoZWlnaHQ9IjYwIiByeD0iMTgiIGZpbGw9IiMxRDlFNzUiLz4KPHJlY3QgeD0iMTI4IiB5PSIxNDgiIHdpZHRoPSIyNTYiIGhlaWdodD0iMjAiIGZpbGw9IiMxRDlFNzUiLz4KPHJlY3QgeD0iMTg4IiB5PSI4OCIgd2lkdGg9IjEzNiIgaGVpZ2h0PSIyOCIgcng9IjE0IiBmaWxsPSIjMEY2RTU2Ii8+CjxyZWN0IHg9IjE0MiIgeT0iMTc4IiB3aWR0aD0iMzIiIGhlaWdodD0iNDAiIHJ4PSI4IiBmaWxsPSIjRUFGM0RFIiBzdHJva2U9IiM5RkUxQ0IiIHN0cm9rZS13aWR0aD0iMiIvPgo8cmVjdCB4PSIxODIiIHk9IjE3OCIgd2lkdGg9IjMyIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI0VBRjNERSIgc3Ryb2tlPSIjOUZFMUNCIiBzdHJva2Utd2lkdGg9IjIiLz4KPHJlY3QgeD0iMjIyIiB5PSIxNzgiIHdpZHRoPSIzMiIgaGVpZ2h0PSI0MCIgcng9IjgiIGZpbGw9IiNFNkYxRkIiIHN0cm9rZT0iIzg1QjdFQiIgc3Ryb2tlLXdpZHRoPSIzIi8+CjxyZWN0IHg9IjI2MiIgeT0iMTc4IiB3aWR0aD0iMzIiIGhlaWdodD0iNDAiIHJ4PSI4IiBmaWxsPSIjZjVmNGYwIiBzdHJva2U9IiNEM0QxQzciIHN0cm9rZS13aWR0aD0iMiIvPgo8cmVjdCB4PSIzMDIiIHk9IjE3OCIgd2lkdGg9IjMyIiBoZWlnaHQ9IjQwIiByeD0iOCIgZmlsbD0iI2Y1ZjRmMCIgc3Ryb2tlPSIjRDNEMUM3IiBzdHJva2Utd2lkdGg9IjIiLz4KPHJlY3QgeD0iMzQyIiB5PSIxNzgiIHdpZHRoPSIzMiIgaGVpZ2h0PSI0MCIgcng9IjgiIGZpbGw9IiNmNWY0ZjAiIHN0cm9rZT0iI0QzRDFDNyIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxjaXJjbGUgY3g9IjE1OCIgY3k9IjE5OCIgcj0iOCIgZmlsbD0iIzYzOTkyMiIvPgo8Y2lyY2xlIGN4PSIxOTgiIGN5PSIxOTgiIHI9IjgiIGZpbGw9IiM2Mzk5MjIiLz4KPGNpcmNsZSBjeD0iMjM4IiBjeT0iMTk4IiByPSI4IiBmaWxsPSIjMzc4QUREIi8+CjxjaXJjbGUgY3g9IjI3OCIgY3k9IjE5OCIgcj0iOCIgZmlsbD0iI0QzRDFDNyIvPgo8Y2lyY2xlIGN4PSIzMTgiIGN5PSIxOTgiIHI9IjgiIGZpbGw9IiNEM0QxQzciLz4KPGNpcmNsZSBjeD0iMzU4IiBjeT0iMTk4IiByPSI4IiBmaWxsPSIjRDNEMUM3Ii8+CjxsaW5lIHgxPSIxNDIiIHkxPSIyMzIiIHgyPSIzNzQiIHkyPSIyMzIiIHN0cm9rZT0iI0UxRjVFRSIgc3Ryb2tlLXdpZHRoPSIyIi8+CjxyZWN0IHg9IjE0MiIgeT0iMjQyIiB3aWR0aD0iNjIiIGhlaWdodD0iNTYiIHJ4PSIxMCIgZmlsbD0iI0VBRjNERSIvPgo8dGV4dCB4PSIxNzMiIHk9IjI2OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjIiIGZpbGw9IiMyNzUwMEEiIGZvbnQtd2VpZ2h0PSI2MDAiPjIvMzwvdGV4dD4KPHRleHQgeD0iMTczIiB5PSIyOTAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjE1IiBmaWxsPSIjNjM5OTIyIj5wcmlzZXM8L3RleHQ+CjxyZWN0IHg9IjIxNCIgeT0iMjQyIiB3aWR0aD0iNjIiIGhlaWdodD0iNTYiIHJ4PSIxMCIgZmlsbD0iI0U2RjFGQiIvPgo8dGV4dCB4PSIyNDUiIHk9IjI2OCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjIiIGZpbGw9IiMwQzQ0N0MiIGZvbnQtd2VpZ2h0PSI2MDAiPjE0PC90ZXh0Pgo8dGV4dCB4PSIyNDUiIHk9IjI5MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMTUiIGZpbGw9IiMzNzhBREQiPnN0b2NrPC90ZXh0Pgo8cmVjdCB4PSIyODYiIHk9IjI0MiIgd2lkdGg9Ijg2IiBoZWlnaHQ9IjU2IiByeD0iMTAiIGZpbGw9IiNFRUVERkUiLz4KPHRleHQgeD0iMzI5IiB5PSIyNjgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmaWxsPSIjM0MzNDg5IiBmb250LXdlaWdodD0iNjAwIj4xMiU8L3RleHQ+Cjx0ZXh0IHg9IjMyOSIgeT0iMjkwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIxNSIgZmlsbD0iIzdGNzdERCI+cmlzcXVlPC90ZXh0Pgo8Y2lyY2xlIGN4PSIzNjgiIGN5PSIxMjgiIHI9IjEyIiBmaWxsPSIjRTFGNUVFIi8+CjxjaXJjbGUgY3g9IjM2OCIgY3k9IjEyOCIgcj0iNyIgZmlsbD0iIzFEOUU3NSIvPgo8dGV4dCB4PSIyNTYiIHk9IjM4MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMzgiIGZpbGw9IiMxYTFhMTgiIGZvbnQtd2VpZ2h0PSI1MDAiPk1lZGljaW5lIEJveDwvdGV4dD4KPHRleHQgeD0iMjU2IiB5PSI0MTgiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXNpemU9IjIyIiBmaWxsPSIjNmI2YjY2Ij5TbWFydCBtZWRpY2F0aW9uIHRyYWNrZXI8L3RleHQ+Cjwvc3ZnPg==">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f7f6f2; --surface:#fff; --border:rgba(0,0,0,.08); --border-md:rgba(0,0,0,.14);
+  --text-primary:#1a1a18; --text-secondary:#6b6b66; --text-tertiary:#a8a8a2;
+  --green-bg:#EAF3DE; --green-text:#27500A; --green-dot:#639922;
+  --blue-bg:#E6F1FB;  --blue-text:#0C447C;  --blue-dot:#378ADD;
+  --amber-bg:#FAEEDA; --amber-text:#633806; --amber-dot:#EF9F27;
+  --red-bg:#FCEBEB;   --red-text:#791F1F;   --red-dot:#E24B4A;
+  --purple-bg:#EEEDFE;--purple-text:#3C3489;--purple-dot:#7F77DD;
+  --gray-dot:#B4B2A9; --teal:#1D9E75;
+  --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --nav-h:52px;
+}
+[data-theme="dark"] {
+  --bg:#18181a; --surface:#232325; --border:rgba(255,255,255,.08); --border-md:rgba(255,255,255,.14);
+  --text-primary:#f0efeb; --text-secondary:#9a9a94; --text-tertiary:#5a5a56;
+  --green-bg:#1a2e10; --green-text:#9FE1CB;
+  --blue-bg:#0d1e30;  --blue-text:#85B7EB;
+  --amber-bg:#2a1e08; --amber-text:#FAC775;
+  --red-bg:#2a0d0d;   --red-text:#F09595;
+  --purple-bg:#1c1a38;--purple-text:#AFA9EC;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text-primary);font-size:14px;line-height:1.5;transition:background .2s,color .2s}
+nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);padding:0 20px;display:flex;align-items:center;height:var(--nav-h);position:sticky;top:0;z-index:100}
+.nav-brand{font-size:15px;font-weight:500;margin-right:24px;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.nav-dot{width:8px;height:8px;border-radius:50%;background:var(--teal);animation:pulse-dot 1.8s ease-in-out infinite}
+@keyframes pulse-dot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.3)}}
+.nav-tabs{display:flex;flex:1}
+.nav-tab{font-size:13px;padding:0 14px;height:var(--nav-h);display:flex;align-items:center;border-bottom:2px solid transparent;cursor:pointer;color:var(--text-secondary);transition:all .15s;user-select:none;white-space:nowrap}
+.nav-tab:hover{color:var(--text-primary)}
+.nav-tab.active{color:var(--text-primary);border-bottom-color:var(--text-primary);font-weight:500}
+.nav-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.icon-btn{width:32px;height:32px;border-radius:var(--radius-sm);border:0.5px solid var(--border);background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-size:14px;transition:background .15s;flex-shrink:0;position:relative}
+.icon-btn:hover{background:var(--bg);color:var(--text-primary)}
+.badge{position:absolute;top:-3px;right:-3px;width:14px;height:14px;border-radius:50%;background:var(--red-dot);color:#fff;font-size:9px;display:flex;align-items:center;justify-content:center;font-weight:500;border:2px solid var(--surface)}
+.page{display:none;padding:20px;max-width:960px;margin:0 auto}
+.page.active{display:block}
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:12px}
+.section-label{font-size:11px;font-weight:500;color:var(--text-tertiary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px}
+.metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.metrics-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.metric{background:var(--bg);border-radius:var(--radius-sm);padding:14px 16px}
+.metric-label{font-size:11px;color:var(--text-secondary);margin-bottom:6px}
+.metric-val{font-size:24px;font-weight:500;line-height:1;margin-bottom:6px}
+.metric-sub{font-size:11px;color:var(--text-secondary)}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px;white-space:nowrap}
+.pill-ok{background:var(--green-bg);color:var(--green-text)}
+.pill-warn{background:var(--amber-bg);color:var(--amber-text)}
+.pill-danger{background:var(--red-bg);color:var(--red-text)}
+.pill-info{background:var(--blue-bg);color:var(--blue-text)}
+.pill-purple{background:var(--purple-bg);color:var(--purple-text)}
+.pill-dot{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.7}
+.comp-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.comp{border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 6px;text-align:center;cursor:pointer;transition:all .15s}
+.comp:hover{border-color:var(--border-md);background:var(--bg)}
+.comp.today{border-color:var(--blue-dot);background:var(--blue-bg)}
+.comp-day{font-size:10px;color:var(--text-secondary);margin-bottom:8px}
+.comp.today .comp-day{color:var(--blue-text);font-weight:500}
+.comp-dot{width:10px;height:10px;border-radius:50%;margin:0 auto 6px}
+.comp-status{font-size:10px;color:var(--text-tertiary);font-family:'DM Mono',monospace}
+.comp.today .comp-status{color:var(--blue-text)}
+.tl-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.tl-row:last-child{border-bottom:none;padding-bottom:0}
+.tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.tl-info{flex:1}
+.tl-name{font-size:13px;color:var(--text-primary)}
+.tl-sub{font-size:11px;color:var(--text-secondary);margin-top:1px}
+.tl-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.tl-time{font-family:'DM Mono',monospace;font-size:12px;color:var(--text-secondary)}
+.alert{border-radius:var(--radius-md);padding:12px 16px;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+.alert-danger{background:var(--red-bg);border:0.5px solid rgba(226,75,74,.2)}
+.alert-warn{background:var(--amber-bg);border:0.5px solid rgba(239,159,39,.2)}
+.alert-info{background:var(--blue-bg);border:0.5px solid rgba(55,138,221,.2)}
+.alert-ok{background:var(--green-bg);border:0.5px solid rgba(99,153,34,.2)}
+.alert-icon{width:16px;height:16px;border-radius:50%;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:#fff}
+.alert-danger .alert-icon{background:var(--red-dot)}
+.alert-warn .alert-icon{background:var(--amber-dot)}
+.alert-info .alert-icon{background:var(--blue-dot)}
+.alert-ok .alert-icon{background:var(--green-dot)}
+.alert-content{flex:1}
+.alert-title{font-size:13px;font-weight:500;margin-bottom:2px}
+.alert-danger .alert-title{color:var(--red-text)}
+.alert-warn .alert-title{color:var(--amber-text)}
+.alert-info .alert-title{color:var(--blue-text)}
+.alert-ok .alert-title{color:var(--green-text)}
+.alert-body{font-size:12px;opacity:.85}
+.alert-danger .alert-body{color:var(--red-text)}
+.alert-warn .alert-body{color:var(--amber-text)}
+.alert-info .alert-body{color:var(--blue-text)}
+.alert-ok .alert-body{color:var(--green-text)}
+.two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+.three-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+.bar-row{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:8px}
+.bar-row:last-child{margin-bottom:0}
+.bar-day{width:28px;color:var(--text-secondary);flex-shrink:0}
+.bar-bg{flex:1;background:var(--bg);border-radius:4px;height:6px;overflow:hidden}
+.bar-fill{height:6px;border-radius:4px}
+.bar-count{width:28px;text-align:right;color:var(--text-secondary);flex-shrink:0;font-family:'DM Mono',monospace;font-size:11px}
+.ml-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:0.5px solid var(--border);font-size:12px}
+.ml-row:last-child{border-bottom:none;padding-bottom:0}
+.ml-left{display:flex;flex-direction:column;gap:2px}
+.ml-name{color:var(--text-primary);font-weight:500}
+.ml-desc{font-size:11px;color:var(--text-secondary)}
+.ml-right{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.gauge-wrap{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.gauge-label{display:flex;justify-content:space-between;font-size:11px}
+.gauge-label span:first-child{color:var(--text-secondary)}
+.gauge-label span:last-child{font-family:'DM Mono',monospace;color:var(--text-primary);font-weight:500}
+.gauge-bg{background:var(--bg);border-radius:4px;height:8px;overflow:hidden}
+.gauge-fill{height:8px;border-radius:4px}
+.hist-row{display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:0.5px solid var(--border);font-size:12px}
+.hist-row:last-child{border-bottom:none;padding-bottom:0}
+.hist-time{font-family:'DM Mono',monospace;color:var(--text-tertiary);min-width:108px;flex-shrink:0}
+.hist-desc{color:var(--text-primary);flex:1}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}
+.page-header-title{font-size:18px;font-weight:500;margin-bottom:2px}
+.page-header-sub{font-size:12px;color:var(--text-secondary)}
+.header-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.status-live{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--green-text);background:var(--green-bg);padding:4px 10px;border-radius:20px;font-weight:500}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--green-dot);animation:pulse-dot 1.8s ease-in-out infinite}
+.legend{display:flex;gap:16px;margin-top:10px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary)}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.notif-panel{display:none;position:fixed;top:calc(var(--nav-h) + 8px);right:20px;width:320px;background:var(--surface);border:0.5px solid var(--border-md);border-radius:var(--radius-lg);z-index:200;overflow:hidden;max-height:400px;overflow-y:auto}
+.notif-panel.open{display:block}
+.notif-header{padding:12px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--surface)}
+.notif-header-title{font-size:13px;font-weight:500}
+.notif-item{padding:12px 16px;border-bottom:0.5px solid var(--border);cursor:pointer;transition:background .1s}
+.notif-item:last-child{border-bottom:none}
+.notif-item:hover{background:var(--bg)}
+.notif-item.unread{background:var(--blue-bg)}
+.notif-item-title{font-size:12px;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+.notif-item-body{font-size:11px;color:var(--text-secondary)}
+.notif-item-time{font-size:10px;color:var(--text-tertiary);margin-top:3px;font-family:'DM Mono',monospace}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:300;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border-md);width:380px;max-width:95vw}
+.modal-header{padding:16px 20px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:500}
+.modal-body{padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.setting-label{font-size:13px;color:var(--text-primary)}
+.setting-sub{font-size:11px;color:var(--text-secondary);margin-top:1px}
+.toggle{width:36px;height:20px;border-radius:10px;background:var(--border-md);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0;border:none;outline:none}
+.toggle.on{background:var(--teal)}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .2s}
+.toggle.on::after{transform:translateX(16px)}
+.modal-footer{padding:12px 20px;border-top:0.5px solid var(--border);display:flex;justify-content:flex-end}
+.btn{padding:7px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;border:0.5px solid var(--border-md);background:transparent;color:var(--text-primary);transition:background .15s}
+.btn:hover{background:var(--bg)}
+.btn-primary{background:var(--text-primary);color:var(--surface);border-color:var(--text-primary)}
+.btn-primary:hover{opacity:.88}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0}
+.detail-item{background:var(--bg);border-radius:var(--radius-sm);padding:10px 12px}
+.detail-item-label{font-size:11px;color:var(--text-secondary);margin-bottom:3px}
+.detail-item-val{font-size:14px;font-weight:500;color:var(--text-primary)}
+.mini-chart{display:flex;align-items:flex-end;gap:3px;height:40px;margin-top:10px}
+.mini-bar{flex:1;border-radius:3px 3px 0 0;min-height:4px}
+.sub-tabs{display:flex;gap:0;border-bottom:0.5px solid var(--border);margin-bottom:16px}
+.sub-tab{font-size:12px;padding:8px 14px;cursor:pointer;color:var(--text-secondary);border-bottom:2px solid transparent;transition:all .15s;user-select:none}
+.sub-tab:hover{color:var(--text-primary)}
+.sub-tab.active{color:var(--text-primary);border-bottom-color:var(--text-primary);font-weight:500}
+.sub-page{display:none}
+.sub-page.active{display:block}
+th{font-weight:500}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand"><div class="nav-dot"></div>Medicine Box</div>
+  <div class="nav-tabs">
+    <div class="nav-tab active" onclick="switchTab('patient',this)">Vue patient</div>
+    <div class="nav-tab" onclick="switchTab('medecin',this)">Vue médecin</div>
+    <div class="nav-tab" onclick="switchTab('ml',this)">Analyses ML</div>
+    <div class="nav-tab" onclick="switchTab('historique',this)">Historique</div>
+  </div>
+  <div class="nav-right">
+    <div class="icon-btn" id="notif-btn" onclick="toggleNotif()" title="Notifications">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a4.5 4.5 0 00-4.5 4.5v2.25L2 9.5v.5h12v-.5l-1.5-1.25V6A4.5 4.5 0 008 1.5zm0 13a2 2 0 002-2H6a2 2 0 002 2z" fill="currentColor"/></svg>
+      <div class="badge">3</div>
+    </div>
+    <div class="icon-btn" onclick="toggleDark()" title="Mode sombre">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 1.5v9A4.5 4.5 0 018 3.5z" fill="currentColor"/></svg>
+    </div>
+    <div class="icon-btn" onclick="openSettings()" title="Paramètres">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" fill="currentColor"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+</nav>
+
+<!-- NOTIF PANEL -->
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-header">
+    <div class="notif-header-title">Notifications</div>
+    <span class="pill pill-danger" style="font-size:10px">3 nouvelles</span>
+  </div>
+  <div class="notif-item unread"><div class="notif-item-title">Alerte stock bas</div><div class="notif-item-body">14 comprimés restants — renouveler dans 5 jours</div><div class="notif-item-time">Aujourd'hui · 08:00</div></div>
+  <div class="notif-item unread"><div class="notif-item-title">Dose soir manquée</div><div class="notif-item-body">Compartiment Mardi — aucune prise détectée</div><div class="notif-item-time">Hier · 20:15</div></div>
+  <div class="notif-item unread"><div class="notif-item-title">Anomalie détectée</div><div class="notif-item-body">Ouverture hors horaire à 03h41 — Isolation Forest</div><div class="notif-item-time">15 mars · 03:41</div></div>
+  <div class="notif-item"><div class="notif-item-title">Dose matin prise</div><div class="notif-item-body">Compartiment Mercredi — 08:04</div><div class="notif-item-time">Aujourd'hui · 08:04</div></div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal" onclick="closeSettingsOutside(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Paramètres</div>
+      <div class="icon-btn" onclick="closeSettings()" style="border:none"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+    </div>
+    <div class="modal-body">
+      <div class="setting-row"><div><div class="setting-label">Mode sombre</div><div class="setting-sub">Interface en thème foncé</div></div><button class="toggle" id="dark-toggle" onclick="toggleDark()"></button></div>
+      <div class="setting-row"><div><div class="setting-label">Notifications push</div><div class="setting-sub">Alertes doses manquées</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-row"><div><div class="setting-label">Rappel soir</div><div class="setting-sub">Rappel automatique à 19h30</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-row"><div><div class="setting-label">Alerte stock bas</div><div class="setting-sub">Seuil : moins de 10 comprimés</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-row"><div><div class="setting-label">Analyse ML automatique</div><div class="setting-sub">Exécution quotidienne à minuit</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary" onclick="closeSettings()">Enregistrer</button></div>
+  </div>
+</div>
+
+<!-- PAGE PATIENT -->
+<div class="page active" id="page-patient">
+  <div class="page-header">
+    <div><div class="page-header-title">Bonjour, Fatima</div><div class="page-header-sub">Mercredi 19 mars 2026</div></div>
+    <div class="header-badges"><div class="status-live"><div class="status-dot"></div>Tout va bien</div></div>
+  </div>
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">Prises aujourd'hui</div><div class="metric-val">2 <span style="font-size:16px;color:var(--text-tertiary);font-weight:400">/ 3</span></div><span class="pill pill-warn"><span class="pill-dot"></span>1 restante ce soir</span></div>
+    <div class="metric"><div class="metric-label">Stock restant</div><div class="metric-val">14 <span style="font-size:14px;color:var(--text-tertiary);font-weight:400">cpmt</span></div><div class="metric-sub">renouveler dans 5 jours</div></div>
+    <div class="metric"><div class="metric-label">Risque dose manquée</div><div class="metric-val">12<span style="font-size:16px;color:var(--text-tertiary);font-weight:400">%</span></div><span class="pill pill-ok"><span class="pill-dot"></span>Faible</span></div>
+  </div>
+  <div class="card">
+    <div class="section-label">Compartiments — semaine en cours</div>
+    <div class="comp-grid">
+      <div class="comp"><div class="comp-day">Lun</div><div class="comp-dot" style="background:var(--green-dot)"></div><div class="comp-status">3/3</div></div>
+      <div class="comp"><div class="comp-day">Mar</div><div class="comp-dot" style="background:var(--amber-dot)"></div><div class="comp-status">2/3</div></div>
+      <div class="comp today"><div class="comp-day">Mer</div><div class="comp-dot" style="background:var(--blue-dot)"></div><div class="comp-status">2/3</div></div>
+      <div class="comp"><div class="comp-day">Jeu</div><div class="comp-dot" style="background:var(--gray-dot)"></div><div class="comp-status">—</div></div>
+      <div class="comp"><div class="comp-day">Ven</div><div class="comp-dot" style="background:var(--gray-dot)"></div><div class="comp-status">—</div></div>
+      <div class="comp"><div class="comp-day">Sam</div><div class="comp-dot" style="background:var(--gray-dot)"></div><div class="comp-status">—</div></div>
+      <div class="comp"><div class="comp-day">Dim</div><div class="comp-dot" style="background:var(--gray-dot)"></div><div class="comp-status">—</div></div>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:var(--green-dot)"></div>Complet</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--amber-dot)"></div>Incomplet</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--blue-dot)"></div>Aujourd'hui</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--gray-dot)"></div>À venir</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">Doses du jour</div>
+    <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Matin — compartiment Mercredi</div><div class="tl-sub">Poids avant : 12.5g · après : 10.2g · Δ 2.3g</div></div><div class="tl-right"><div class="tl-time">08:04</div><span class="pill pill-ok">Pris</span></div></div>
+    <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Midi — compartiment Mercredi</div><div class="tl-sub">Poids avant : 10.2g · après : 8.0g · Δ 2.2g</div></div><div class="tl-right"><div class="tl-time">13:12</div><span class="pill pill-ok">Pris</span></div></div>
+    <div class="tl-row"><div class="tl-dot" style="background:var(--amber-dot)"></div><div class="tl-info"><div class="tl-name">Soir — compartiment Mercredi</div><div class="tl-sub">Prévue à 20:00 — pas encore détectée</div></div><div class="tl-right"><div class="tl-time">20:00</div><span class="pill pill-warn">En attente</span></div></div>
+  </div>
+  <div class="alert alert-danger"><div class="alert-icon">!</div><div class="alert-content"><div class="alert-title">Alerte stock</div><div class="alert-body">Il reste 14 comprimés — pensez à renouveler l'ordonnance dans 5 jours.</div></div></div>
+  <div class="alert alert-warn"><div class="alert-icon">!</div><div class="alert-content"><div class="alert-title">Dose manquée hier soir</div><div class="alert-body">Compartiment Mardi — dose du soir non détectée à 20h15.</div></div></div>
+</div>
+
+<!-- PAGE MÉDECIN -->
+<div class="page" id="page-medecin">
+  <div class="page-header">
+    <div><div class="page-header-title">Dashboard médecin</div><div class="page-header-sub">Patient : Fatima · ID 042 · Mercredi 19 mars 2026</div></div>
+    <div class="header-badges"><span class="pill pill-ok"><span class="pill-dot"></span>Système actif</span><span class="pill pill-info"><span class="pill-dot"></span>ESP32 connecté</span><span class="pill pill-purple"><span class="pill-dot"></span>MLflow v1.4</span></div>
+  </div>
+  <div class="metrics-4">
+    <div class="metric"><div class="metric-label">Observance 7 jours</div><div class="metric-val">85<span style="font-size:14px;color:var(--text-tertiary);font-weight:400">%</span></div><span class="pill pill-ok"><span class="pill-dot"></span>Bonne</span></div>
+    <div class="metric"><div class="metric-label">Doses manquées</div><div class="metric-val">3</div><div class="metric-sub">ce mois · 2 soirs</div></div>
+    <div class="metric"><div class="metric-label">Risque ML demain</div><div class="metric-val">34<span style="font-size:14px;color:var(--text-tertiary);font-weight:400">%</span></div><span class="pill pill-warn"><span class="pill-dot"></span>Modéré</span></div>
+    <div class="metric"><div class="metric-label">Stock estimé</div><div class="metric-val">J+5</div><span class="pill pill-danger"><span class="pill-dot"></span>Renouveler</span></div>
+  </div>
+  <div class="two-col">
+    <div class="card" style="margin-bottom:0">
+      <div class="section-label">Observance par jour</div>
+      <div class="bar-row"><div class="bar-day">Lun</div><div class="bar-bg"><div class="bar-fill" style="width:100%;background:var(--green-dot)"></div></div><div class="bar-count">3/3</div></div>
+      <div class="bar-row"><div class="bar-day">Mar</div><div class="bar-bg"><div class="bar-fill" style="width:66%;background:var(--amber-dot)"></div></div><div class="bar-count">2/3</div></div>
+      <div class="bar-row"><div class="bar-day">Mer</div><div class="bar-bg"><div class="bar-fill" style="width:66%;background:var(--blue-dot)"></div></div><div class="bar-count">2/3</div></div>
+      <div class="bar-row"><div class="bar-day">Jeu</div><div class="bar-bg"><div class="bar-fill" style="width:0%;background:var(--gray-dot)"></div></div><div class="bar-count" style="color:var(--text-tertiary)">—</div></div>
+      <div class="bar-row"><div class="bar-day">Ven</div><div class="bar-bg"><div class="bar-fill" style="width:0%;background:var(--gray-dot)"></div></div><div class="bar-count" style="color:var(--text-tertiary)">—</div></div>
+      <div class="mini-chart" id="mini-chart"></div>
+      <div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">Observance 30 derniers jours</div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="section-label">Modèles ML — état</div>
+      <div class="ml-row"><div class="ml-left"><div class="ml-name">Isolation Forest</div><div class="ml-desc">Détection anomalies capteur</div></div><div class="ml-right"><span class="pill pill-ok">0 anomalie</span><span style="font-size:10px;color:var(--text-tertiary);font-family:'DM Mono',monospace">acc. 94%</span></div></div>
+      <div class="ml-row"><div class="ml-left"><div class="ml-name">Random Forest</div><div class="ml-desc">Risque dose manquée</div></div><div class="ml-right"><span class="pill pill-warn">34% risque</span><span style="font-size:10px;color:var(--text-tertiary);font-family:'DM Mono',monospace">acc. 88%</span></div></div>
+      <div class="ml-row"><div class="ml-left"><div class="ml-name">Régression linéaire</div><div class="ml-desc">Prédiction stock</div></div><div class="ml-right"><span style="font-size:12px;font-family:'DM Mono',monospace;color:var(--text-primary)">J+5</span><span style="font-size:10px;color:var(--text-tertiary);font-family:'DM Mono',monospace">R²=0.91</span></div></div>
+      <div class="ml-row"><div class="ml-left"><div class="ml-name">MLflow</div><div class="ml-desc">Dernière exécution</div></div><div class="ml-right"><span class="pill pill-purple">run v1.4</span><span style="font-size:10px;color:var(--text-tertiary);font-family:'DM Mono',monospace">il y a 2h</span></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">Informations patient</div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="detail-item-label">Nom</div><div class="detail-item-val">Fatima Benmoussa</div></div>
+      <div class="detail-item"><div class="detail-item-label">ID patient</div><div class="detail-item-val" style="font-family:'DM Mono',monospace">#042</div></div>
+      <div class="detail-item"><div class="detail-item-label">Médicament</div><div class="detail-item-val">Doliprane 500mg</div></div>
+      <div class="detail-item"><div class="detail-item-label">Fréquence</div><div class="detail-item-val">3 × / jour</div></div>
+      <div class="detail-item"><div class="detail-item-label">Début traitement</div><div class="detail-item-val">10 mars 2026</div></div>
+      <div class="detail-item"><div class="detail-item-label">Médecin référent</div><div class="detail-item-val">Dr. Saidi</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">Historique des alertes</div>
+    <div class="hist-row"><div class="hist-time">Mar 18 · 20:15</div><div class="hist-desc">Dose soir manquée — compartiment Mardi</div><span class="pill pill-warn">Manquée</span></div>
+    <div class="hist-row"><div class="hist-time">Mar 17 · 08:02</div><div class="hist-desc">Ouverture compartiment Lundi</div><span class="pill pill-ok">Normal</span></div>
+    <div class="hist-row"><div class="hist-time">Mar 15 · 03:41</div><div class="hist-desc">Ouverture hors horaire détectée</div><span class="pill pill-danger">Anomalie</span></div>
+    <div class="hist-row"><div class="hist-time">Mar 14 · 13:07</div><div class="hist-desc">Dose midi prise — compartiment Lundi</div><span class="pill pill-ok">Normal</span></div>
+    <div class="hist-row"><div class="hist-time">Mar 12 · 20:31</div><div class="hist-desc">Dose soir manquée — compartiment Samedi</div><span class="pill pill-warn">Manquée</span></div>
+  </div>
+  <div class="alert alert-warn"><div class="alert-icon">!</div><div class="alert-content"><div class="alert-title">Prédiction Random Forest</div><div class="alert-body">Risque modéré (34%) de dose manquée demain soir. Historique : 2 manqués les mercredis soirs ce mois.</div></div></div>
+</div>
+
+<!-- PAGE ML -->
+<div class="page" id="page-ml">
+  <div class="page-header">
+    <div><div class="page-header-title">Analyses ML</div><div class="page-header-sub">Dernière exécution : aujourd'hui à 02:00 · MLflow v1.4</div></div>
+    <div class="header-badges"><span class="pill pill-purple"><span class="pill-dot"></span>3 modèles actifs</span></div>
+  </div>
+  <div class="three-col">
+    <div class="card" style="margin-bottom:0">
+      <div class="section-label">Isolation Forest</div>
+      <div style="font-size:22px;font-weight:500;margin-bottom:6px">0 <span style="font-size:13px;color:var(--text-tertiary);font-weight:400">anomalie</span></div>
+      <span class="pill pill-ok" style="margin-bottom:12px"><span class="pill-dot"></span>Normal</span>
+      <div class="gauge-wrap">
+        <div class="gauge-label"><span>Précision</span><span>94%</span></div>
+        <div class="gauge-bg"><div class="gauge-fill" style="width:94%;background:var(--green-dot)"></div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:10px">Détecte les ouvertures anormales du boîtier par analyse du poids et des horaires.</div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="section-label">Random Forest</div>
+      <div style="font-size:22px;font-weight:500;margin-bottom:6px">34<span style="font-size:13px;color:var(--text-tertiary);font-weight:400">% risque</span></div>
+      <span class="pill pill-warn" style="margin-bottom:12px"><span class="pill-dot"></span>Modéré</span>
+      <div class="gauge-wrap">
+        <div class="gauge-label"><span>Précision</span><span>88%</span></div>
+        <div class="gauge-bg"><div class="gauge-fill" style="width:88%;background:var(--amber-dot)"></div></div>
+        <div class="gauge-label" style="margin-top:6px"><span>Risque demain</span><span>34%</span></div>
+        <div class="gauge-bg"><div class="gauge-fill" style="width:34%;background:var(--amber-dot)"></div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:10px">Prédit la probabilité d'une dose manquée selon l'heure, le jour et l'historique patient.</div>
+    </div>
+    <div class="card" style="margin-bottom:0">
+      <div class="section-label">Régression linéaire</div>
+      <div style="font-size:22px;font-weight:500;margin-bottom:6px">J+5 <span style="font-size:13px;color:var(--text-tertiary);font-weight:400">épuisement</span></div>
+      <span class="pill pill-danger" style="margin-bottom:12px"><span class="pill-dot"></span>Stock critique</span>
+      <div class="gauge-wrap">
+        <div class="gauge-label"><span>R² score</span><span>0.91</span></div>
+        <div class="gauge-bg"><div class="gauge-fill" style="width:91%;background:var(--blue-dot)"></div></div>
+        <div class="gauge-label" style="margin-top:6px"><span>Stock actuel</span><span>14 cpmt</span></div>
+        <div class="gauge-bg"><div class="gauge-fill" style="width:18%;background:var(--red-dot)"></div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-top:10px">Prédit la date d'épuisement du stock selon la tendance de consommation journalière.</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="section-label">MLflow — suivi des runs</div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead><tr style="border-bottom:0.5px solid var(--border)">
+          <th style="text-align:left;padding:8px 0;color:var(--text-secondary);font-weight:500">Run</th>
+          <th style="text-align:left;padding:8px 0;color:var(--text-secondary);font-weight:500">Modèle</th>
+          <th style="text-align:left;padding:8px 0;color:var(--text-secondary);font-weight:500">Date</th>
+          <th style="text-align:left;padding:8px 0;color:var(--text-secondary);font-weight:500">Score</th>
+          <th style="text-align:left;padding:8px 0;color:var(--text-secondary);font-weight:500">Statut</th>
+        </tr></thead>
+        <tbody>
+          <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-tertiary)">v1.4</td><td style="padding:8px 0">Random Forest</td><td style="padding:8px 0;color:var(--text-secondary)">19/03 · 02:00</td><td style="padding:8px 0;font-family:'DM Mono',monospace">88%</td><td style="padding:8px 0"><span class="pill pill-ok">Actif</span></td></tr>
+          <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-tertiary)">v1.3</td><td style="padding:8px 0">Isolation Forest</td><td style="padding:8px 0;color:var(--text-secondary)">18/03 · 02:00</td><td style="padding:8px 0;font-family:'DM Mono',monospace">94%</td><td style="padding:8px 0"><span class="pill pill-ok">Actif</span></td></tr>
+          <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-tertiary)">v1.2</td><td style="padding:8px 0">Régression linéaire</td><td style="padding:8px 0;color:var(--text-secondary)">17/03 · 02:00</td><td style="padding:8px 0;font-family:'DM Mono',monospace">R²=0.91</td><td style="padding:8px 0"><span class="pill pill-ok">Actif</span></td></tr>
+          <tr><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-tertiary)">v1.1</td><td style="padding:8px 0">Random Forest</td><td style="padding:8px 0;color:var(--text-secondary)">15/03 · 02:00</td><td style="padding:8px 0;font-family:'DM Mono',monospace">81%</td><td style="padding:8px 0"><span class="pill pill-warn">Archivé</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="alert alert-info"><div class="alert-icon" style="font-style:normal">i</div><div class="alert-content"><div class="alert-title">Prochaine exécution</div><div class="alert-body">Les modèles se réentraînent automatiquement chaque nuit à 02:00 avec les nouvelles données via MLflow.</div></div></div>
+</div>
+
+<!-- PAGE HISTORIQUE -->
+<div class="page" id="page-historique">
+  <div class="page-header">
+    <div><div class="page-header-title">Historique complet</div><div class="page-header-sub">Toutes les prises et événements système</div></div>
+  </div>
+  <div class="sub-tabs">
+    <div class="sub-tab active" onclick="switchSubTab('prises',this)">Prises</div>
+    <div class="sub-tab" onclick="switchSubTab('alertes',this)">Alertes</div>
+    <div class="sub-tab" onclick="switchSubTab('poids',this)">Poids capteur</div>
+  </div>
+  <div class="sub-page active" id="sub-prises">
+    <div class="card">
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Matin — compartiment Mercredi</div><div class="tl-sub">12.5g → 10.2g · Δ 2.3g</div></div><div class="tl-right"><div class="tl-time">Mer 19 · 08:04</div><span class="pill pill-ok">Pris</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Midi — compartiment Mercredi</div><div class="tl-sub">10.2g → 8.0g · Δ 2.2g</div></div><div class="tl-right"><div class="tl-time">Mer 19 · 13:12</div><span class="pill pill-ok">Pris</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Matin — compartiment Mardi</div><div class="tl-sub">12.5g → 10.3g · Δ 2.2g</div></div><div class="tl-right"><div class="tl-time">Mar 18 · 08:11</div><span class="pill pill-ok">Pris</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Midi — compartiment Mardi</div><div class="tl-sub">10.3g → 8.2g · Δ 2.1g</div></div><div class="tl-right"><div class="tl-time">Mar 18 · 13:05</div><span class="pill pill-ok">Pris</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--red-dot)"></div><div class="tl-info"><div class="tl-name">Soir — compartiment Mardi</div><div class="tl-sub">Aucune variation détectée à 20h15</div></div><div class="tl-right"><div class="tl-time">Mar 18 · 20:15</div><span class="pill pill-danger">Manquée</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Matin — compartiment Lundi</div><div class="tl-sub">12.5g → 10.1g · Δ 2.4g</div></div><div class="tl-right"><div class="tl-time">Lun 17 · 08:02</div><span class="pill pill-ok">Pris</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Midi — compartiment Lundi</div><div class="tl-sub">10.1g → 8.1g · Δ 2.0g</div></div><div class="tl-right"><div class="tl-time">Lun 17 · 13:10</div><span class="pill pill-ok">Pris</span></div></div>
+      <div class="tl-row"><div class="tl-dot" style="background:var(--green-dot)"></div><div class="tl-info"><div class="tl-name">Soir — compartiment Lundi</div><div class="tl-sub">8.1g → 6.0g · Δ 2.1g</div></div><div class="tl-right"><div class="tl-time">Lun 17 · 20:02</div><span class="pill pill-ok">Pris</span></div></div>
+    </div>
+  </div>
+  <div class="sub-page" id="sub-alertes">
+    <div class="card">
+      <div class="hist-row"><div class="hist-time">Mer 19 · 08:00</div><div class="hist-desc">Stock bas — 14 comprimés restants, renouveler J+5</div><span class="pill pill-danger">Stock</span></div>
+      <div class="hist-row"><div class="hist-time">Mar 18 · 20:15</div><div class="hist-desc">Dose soir manquée — compartiment Mardi</div><span class="pill pill-warn">Manquée</span></div>
+      <div class="hist-row"><div class="hist-time">Mar 17 · 08:02</div><div class="hist-desc">Ouverture normale — compartiment Lundi matin</div><span class="pill pill-ok">Normal</span></div>
+      <div class="hist-row"><div class="hist-time">Mar 15 · 03:41</div><div class="hist-desc">Ouverture hors horaire — Isolation Forest alerte</div><span class="pill pill-danger">Anomalie</span></div>
+      <div class="hist-row"><div class="hist-time">Mar 12 · 20:31</div><div class="hist-desc">Dose soir manquée — compartiment Samedi</div><span class="pill pill-warn">Manquée</span></div>
+    </div>
+  </div>
+  <div class="sub-page" id="sub-poids">
+    <div class="card">
+      <div class="section-label">Poids brut — données InfluxDB</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;font-size:12px;border-collapse:collapse;min-width:480px">
+          <thead><tr style="border-bottom:0.5px solid var(--border)">
+            <th style="text-align:left;padding:8px 0;color:var(--text-secondary)">Timestamp</th>
+            <th style="text-align:left;padding:8px 0;color:var(--text-secondary)">Compartiment</th>
+            <th style="text-align:right;padding:8px 0;color:var(--text-secondary)">Poids (g)</th>
+            <th style="text-align:left;padding:8px 12px;color:var(--text-secondary)">Statut</th>
+          </tr></thead>
+          <tbody>
+            <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-secondary);font-size:11px">2026-03-19 13:12:04</td><td style="padding:8px 0">Mercredi · Midi</td><td style="padding:8px 0;text-align:right;font-family:'DM Mono',monospace">8.0</td><td style="padding:8px 12px"><span class="pill pill-ok">Pris</span></td></tr>
+            <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-secondary);font-size:11px">2026-03-19 08:04:21</td><td style="padding:8px 0">Mercredi · Matin</td><td style="padding:8px 0;text-align:right;font-family:'DM Mono',monospace">10.2</td><td style="padding:8px 12px"><span class="pill pill-ok">Pris</span></td></tr>
+            <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-secondary);font-size:11px">2026-03-18 20:15:00</td><td style="padding:8px 0">Mardi · Soir</td><td style="padding:8px 0;text-align:right;font-family:'DM Mono',monospace">8.2</td><td style="padding:8px 12px"><span class="pill pill-danger">Manquée</span></td></tr>
+            <tr style="border-bottom:0.5px solid var(--border)"><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-secondary);font-size:11px">2026-03-18 13:05:17</td><td style="padding:8px 0">Mardi · Midi</td><td style="padding:8px 0;text-align:right;font-family:'DM Mono',monospace">8.2</td><td style="padding:8px 12px"><span class="pill pill-ok">Pris</span></td></tr>
+            <tr><td style="padding:8px 0;font-family:'DM Mono',monospace;color:var(--text-secondary);font-size:11px">2026-03-18 08:11:33</td><td style="padding:8px 0">Mardi · Matin</td><td style="padding:8px 0;text-align:right;font-family:'DM Mono',monospace">10.3</td><td style="padding:8px 12px"><span class="pill pill-ok">Pris</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(page,el){document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));el.classList.add('active');document.getElementById('page-'+page).classList.add('active');closeNotif();}
+function switchSubTab(id,el){document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.sub-page').forEach(p=>p.classList.remove('active'));el.classList.add('active');document.getElementById('sub-'+id).classList.add('active');}
+function toggleNotif(){document.getElementById('notif-panel').classList.toggle('open');}
+function closeNotif(){document.getElementById('notif-panel').classList.remove('open');}
+document.addEventListener('click',function(e){const p=document.getElementById('notif-panel');const b=document.getElementById('notif-btn');if(!p.contains(e.target)&&!b.contains(e.target))closeNotif();});
+let dark=false;
+function toggleDark(){dark=!dark;document.documentElement.setAttribute('data-theme',dark?'dark':'');const t=document.getElementById('dark-toggle');if(t)t.classList.toggle('on',dark);}
+function openSettings(){document.getElementById('settings-modal').classList.add('open');closeNotif();}
+function closeSettings(){document.getElementById('settings-modal').classList.remove('open');}
+function closeSettingsOutside(e){if(e.target===document.getElementById('settings-modal'))closeSettings();}
+const data30=[100,100,67,100,67,100,33,100,100,67,100,100,67,100,100,33,67,100,100,100,67,100,100,33,100,67,100,100,67,85];
+const chart=document.getElementById('mini-chart');
+if(chart){const max=Math.max(...data30);data30.forEach(v=>{const b=document.createElement('div');b.className='mini-bar';b.style.height=(v/max*36+4)+'px';b.style.background=v>=100?'var(--green-dot)':v>=67?'var(--amber-dot)':'var(--red-dot)';b.style.opacity='0.65';chart.appendChild(b);});}
+</script>
+</body>
+</html>
