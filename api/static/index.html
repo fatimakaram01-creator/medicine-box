@@ -226,7 +226,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="nav-tabs">
     <div class="nav-tab active" onclick="switchTab('patient',this)">Patient</div>
     <div class="nav-tab" onclick="switchTab('medecin',this)">Médecin</div>
-    <div class="nav-tab" onclick="switchTab('controles',this)">Contrôles</div>
     <div class="nav-tab" onclick="switchTab('historique',this)">Historique</div>
   </div>
 </nav>
@@ -331,6 +330,34 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div id="doses-today"><div class="loading">Chargement...</div></div>
   </div>
   <div id="patient-alerts"></div>
+
+  <div class="ctrl-card" style="border:1.5px solid var(--teal)">
+    <div class="section-label">Système</div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <div class="ctrl-label">⚡ Système actif</div>
+        <div class="ctrl-sub">Active ou met en pause le suivi des prises, les alertes et la collecte de données.</div>
+      </div>
+      <button class="toggle" id="toggle-system" onclick="toggleSystemFromCtrl()"></button>
+    </div>
+  </div>
+  <div class="ctrl-card">
+    <div class="section-label">Modes</div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🔄 Mode remplissage</div>
+        <div class="ctrl-sub">Désactive la détection HX711 pour remplir les compartiments.</div>
+      </div>
+      <button class="toggle" id="toggle-remplissage" onclick="toggleConfig('remplissage')"></button>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🔔 Buzzer</div>
+        <div class="ctrl-sub">Active/désactive les alertes sonores de la boîte.</div>
+      </div>
+      <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
+    </div>
+  </div>
 </div>
 
 <!-- ════════════ PAGE MÉDECIN ════════════ -->
@@ -355,102 +382,55 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="section-label">Dernières alertes</div>
     <div id="medecin-alertes"><div class="loading">Chargement...</div></div>
   </div>
+  <div class="ctrl-card">
+    <div class="section-label">Contextes spéciaux</div>
+    <div class="ctrl-row" style="flex-wrap:wrap">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🏥 Hospitalisation</div>
+        <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
+      </div>
+      <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
+      <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
+        <input type="date" id="hospi-date" placeholder="Date de retour">
+      </div>
+    </div>
+  </div>
+  <div class="ctrl-card">
+    <div class="section-label">Changement de prescription</div>
+    <div class="input-wrap">
+      <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
+      <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
+      <select id="rx-frequence">
+        <option value="1">1 prise / jour</option>
+        <option value="2">2 prises / jour</option>
+        <option value="3" selected>3 prises / jour</option>
+      </select>
+      <input type="text" id="rx-medecin" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
+      <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
+      <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
+    </div>
+  </div>
+  <div class="ctrl-card">
+    <div class="section-label">Profil horaire</div>
+    <div class="input-wrap">
+      <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
+      <div class="time-grid">
+        <div class="time-group"><label>🌅 Matin — début</label><input type="time" id="matin-debut" value="06:00"></div>
+        <div class="time-group"><label>🌅 Matin — fin</label><input type="time" id="matin-fin" value="11:00"></div>
+        <div class="time-group"><label>☀️ Midi — début</label><input type="time" id="midi-debut" value="11:00"></div>
+        <div class="time-group"><label>☀️ Midi — fin</label><input type="time" id="midi-fin" value="16:00"></div>
+        <div class="time-group"><label>🌙 Soir — début</label><input type="time" id="soir-debut" value="16:00"></div>
+        <div class="time-group"><label>🌙 Soir — fin</label><input type="time" id="soir-fin" value="22:00"></div>
+      </div>
+      <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
+    </div>
+  </div>
   <div class="card">
-    <div class="section-label">Profils horaires</div>
+    <div class="section-label">Historique des profils horaires</div>
     <div id="profils-historique"><div class="loading">Chargement...</div></div>
   </div>
 </div>
 
-<!-- ════════════ PAGE CONTRÔLES ════════════ -->
-<div class="page" id="page-controles">
-  <div class="page-header">
-    <div><div class="page-header-title">Contrôles du système</div><div class="page-header-sub">Gérer les modes de la Medicine Box</div></div>
-  </div>
-  <div class="ctrl-card" style="border:1.5px solid var(--teal)">
-    <div class="section-label">Système</div>
-    <div class="ctrl-row">
-      <div class="ctrl-left">
-        <div class="ctrl-label">⚡ Système actif</div>
-        <div class="ctrl-sub">Active ou met en pause le suivi des prises, les alertes et la collecte de données.</div>
-      </div>
-      <button class="toggle" id="toggle-system" onclick="toggleSystemFromCtrl()"></button>
-    </div>
-  </div>
-  <div class="ctrl-card">
-    <div class="section-label">Modes de fonctionnement</div>
-    <div class="ctrl-row">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🔄 Mode remplissage</div>
-        <div class="ctrl-sub">Désactive la détection HX711 pour remplir les compartiments. Ouvrez le couvercle pour naviguer avec les boutons poussoir.</div>
-      </div>
-      <button class="toggle" id="toggle-remplissage" onclick="toggleConfig('remplissage')"></button>
-    </div>
-    <div class="ctrl-row">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🔔 Buzzer</div>
-        <div class="ctrl-sub">Active/désactive les alertes sonores de la boîte.</div>
-      </div>
-      <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
-    </div>
-  </div>
-  <!-- ── Section médecin (PIN requis) ── -->
-  <div id="ctrl-medecin-locked" style="margin-bottom:12px">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);cursor:pointer" onclick="demanderPinControles()">
-      <div>
-        <div style="font-size:13px;font-weight:500">🔒 Section médecin</div>
-        <div style="font-size:11px;color:var(--text-secondary);margin-top:1px">Hospitalisation · Prescription · Profil horaire</div>
-      </div>
-      <span class="pill pill-info">Déverrouiller</span>
-    </div>
-  </div>
-
-  <div id="ctrl-medecin-content" style="display:none">
-    <div class="ctrl-card">
-      <div class="section-label">Contextes spéciaux</div>
-      <div class="ctrl-row" style="flex-wrap:wrap">
-        <div class="ctrl-left">
-          <div class="ctrl-label">🏥 Hospitalisation</div>
-          <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
-        </div>
-        <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
-        <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
-          <input type="date" id="hospi-date" placeholder="Date de retour">
-        </div>
-      </div>
-    </div>
-    <div class="ctrl-card">
-      <div class="section-label">Changement de prescription</div>
-      <div class="input-wrap">
-        <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
-        <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
-        <select id="rx-frequence">
-          <option value="1">1 prise / jour</option>
-          <option value="2">2 prises / jour</option>
-          <option value="3" selected>3 prises / jour</option>
-        </select>
-        <input type="text" id="rx-medecin" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
-        <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
-        <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
-      </div>
-    </div>
-    <div class="ctrl-card">
-      <div class="section-label">Profil horaire</div>
-      <div class="input-wrap">
-        <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
-        <div class="time-grid">
-          <div class="time-group"><label>🌅 Matin — début</label><input type="time" id="matin-debut" value="06:00"></div>
-          <div class="time-group"><label>🌅 Matin — fin</label><input type="time" id="matin-fin" value="11:00"></div>
-          <div class="time-group"><label>☀️ Midi — début</label><input type="time" id="midi-debut" value="11:00"></div>
-          <div class="time-group"><label>☀️ Midi — fin</label><input type="time" id="midi-fin" value="16:00"></div>
-          <div class="time-group"><label>🌙 Soir — début</label><input type="time" id="soir-debut" value="16:00"></div>
-          <div class="time-group"><label>🌙 Soir — fin</label><input type="time" id="soir-fin" value="22:00"></div>
-        </div>
-        <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
-      </div>
-    </div>
-  </div>
-  <div id="ctrl-status"></div>
-</div>
 
 <!-- ════════════ PAGE HISTORIQUE ════════════ -->
 <div class="page" id="page-historique">
@@ -812,20 +792,6 @@ function switchTab(page, el) {
   _doSwitchTab(page, el);
 }
 
-function demanderPinControles() {
-  if (medecinUnlocked) {
-    afficherSectionMedecin();
-    return;
-  }
-  pendingTab = { action: 'ctrl-medecin' };
-  openPinOverlay();
-}
-
-function afficherSectionMedecin() {
-  document.getElementById('ctrl-medecin-locked').style.display = 'none';
-  document.getElementById('ctrl-medecin-content').style.display = 'block';
-}
-
 function _doSwitchTab(page, el) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -1001,11 +967,7 @@ function pinKey(k) {
         medecinUnlocked = true;
         document.getElementById('pin-overlay').classList.remove('open');
         if (pendingTab) {
-          if (pendingTab.action === 'ctrl-medecin') {
-            afficherSectionMedecin();
-          } else {
-            _doSwitchTab(pendingTab.page, pendingTab.el);
-          }
+          _doSwitchTab(pendingTab.page, pendingTab.el);
           pendingTab = null;
         }
       } else {
