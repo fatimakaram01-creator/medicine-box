@@ -177,32 +177,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .setting-sub{font-size:11px;color:var(--text-secondary);margin-top:1px}
 .modal-footer{padding:10px 18px;border-top:0.5px solid var(--border);display:flex;justify-content:flex-end}
 @media(min-width:600px){.metrics-4{grid-template-columns:repeat(4,minmax(0,1fr))}}
-
-/* ── PIN Médecin ── */
-.pin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center}
-.pin-overlay.open{display:flex}
-.pin-box{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border-md);width:300px;max-width:92vw;padding:24px;text-align:center}
-.pin-title{font-size:15px;font-weight:500;margin-bottom:4px}
-.pin-sub{font-size:12px;color:var(--text-secondary);margin-bottom:18px}
-.pin-dots{display:flex;justify-content:center;gap:10px;margin-bottom:18px}
-.pin-dot-ind{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--border-md);background:transparent;transition:background .15s}
-.pin-dot-ind.filled{background:var(--teal);border-color:var(--teal)}
-.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.pin-key{height:44px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--bg);color:var(--text-primary);font-size:16px;font-weight:500;cursor:pointer;transition:background .15s}
-.pin-key:hover{background:var(--border)}
-.pin-error{font-size:12px;color:var(--red-text);min-height:16px;margin-bottom:4px}
-
-/* ── Profils horaires ── */
-.profil-card{background:var(--bg);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;border:1px solid var(--border)}
-.profil-card.actif{border-color:var(--teal);background:rgba(29,158,117,.07)}
-.profil-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-.profil-label{font-size:13px;font-weight:500}
-.profil-plages{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-secondary)}
-.profil-plage{background:var(--surface);border:0.5px solid var(--border);border-radius:20px;padding:2px 8px}
-.time-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.time-group{display:flex;flex-direction:column;gap:4px}
-.time-group label{font-size:11px;color:var(--text-secondary)}
-.time-group input{padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--bg);color:var(--text-primary);font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
 </style>
 </head>
 <body>
@@ -226,6 +200,7 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="nav-tabs">
     <div class="nav-tab active" onclick="switchTab('patient',this)">Patient</div>
     <div class="nav-tab" onclick="switchTab('medecin',this)">Médecin</div>
+    <div class="nav-tab" onclick="switchTab('controles',this)">Contrôles</div>
     <div class="nav-tab" onclick="switchTab('historique',this)">Historique</div>
   </div>
 </nav>
@@ -330,48 +305,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div id="doses-today"><div class="loading">Chargement...</div></div>
   </div>
   <div id="patient-alerts"></div>
-
-  <div class="ctrl-card" style="border:1.5px solid var(--teal)">
-    <div class="section-label">Système</div>
-    <div class="ctrl-row">
-      <div class="ctrl-left">
-        <div class="ctrl-label">⚡ Système actif</div>
-        <div class="ctrl-sub">Active ou met en pause le suivi des prises, les alertes et la collecte de données.</div>
-      </div>
-      <button class="toggle" id="toggle-system" onclick="toggleSystemFromCtrl()"></button>
-    </div>
-  </div>
-  <div class="ctrl-card">
-    <div class="section-label">Modes</div>
-    <div class="ctrl-row">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🔄 Mode remplissage</div>
-        <div class="ctrl-sub">Désactive la détection HX711 pour remplir les compartiments.</div>
-      </div>
-      <button class="toggle" id="toggle-remplissage" onclick="toggleConfig('remplissage')"></button>
-    </div>
-    <div class="ctrl-row">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🔔 Buzzer</div>
-        <div class="ctrl-sub">Active/désactive les alertes sonores de la boîte.</div>
-      </div>
-      <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
-    </div>
-  </div>
-  <div class="ctrl-card">
-    <div class="section-label">Contextes spéciaux</div>
-    <div id="contextes-speciaux-list"><div class="loading">Chargement...</div></div>
-    <div class="ctrl-row" style="flex-wrap:wrap;margin-top:4px">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🏥 Hospitalisation</div>
-        <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
-      </div>
-      <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
-      <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
-        <input type="date" id="hospi-date" placeholder="Date de retour">
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- ════════════ PAGE MÉDECIN ════════════ -->
@@ -396,8 +329,73 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="section-label">Dernières alertes</div>
     <div id="medecin-alertes"><div class="loading">Chargement...</div></div>
   </div>
+</div>
+
+<!-- ════════════ PAGE CONTRÔLES ════════════ -->
+<div class="page" id="page-controles">
+  <div class="page-header">
+    <div><div class="page-header-title">Contrôles du système</div><div class="page-header-sub">Gérer les modes de la Medicine Box</div></div>
+  </div>
+  <div class="ctrl-card" style="border:1.5px solid var(--teal)">
+    <div class="section-label">Système</div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <div class="ctrl-label">⚡ Système actif</div>
+        <div class="ctrl-sub">Active ou met en pause le suivi des prises, les alertes et la collecte de données.</div>
+      </div>
+      <button class="toggle" id="toggle-system" onclick="toggleSystemFromCtrl()"></button>
+    </div>
+  </div>
   <div class="ctrl-card">
-    <div class="section-label">Changement de prescription</div>
+    <div class="section-label">Modes de fonctionnement</div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🔄 Mode remplissage</div>
+        <div class="ctrl-sub">Désactive la détection HX711 pour remplir les compartiments. Ouvrez le couvercle pour naviguer avec les boutons poussoir.</div>
+      </div>
+      <button class="toggle" id="toggle-remplissage" onclick="toggleConfig('remplissage')"></button>
+    </div>
+    <div class="ctrl-row">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🔔 Buzzer</div>
+        <div class="ctrl-sub">Active/désactive les alertes sonores de la boîte.</div>
+      </div>
+      <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
+    </div>
+  </div>
+  <div class="ctrl-card">
+    <div class="section-label">Contextes spéciaux</div>
+    <div class="ctrl-row" style="flex-wrap:wrap">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🌙 Mode Ramadan</div>
+        <div class="ctrl-sub">Décale les horaires : shour avant le fajr, midi suspendu, iftar après le coucher du soleil.</div>
+      </div>
+      <button class="toggle" id="toggle-ramadan" onclick="toggleRamadan()"></button>
+      <div class="select-wrap" id="ramadan-ville-wrap" style="width:100%;display:none">
+        <select id="ramadan-ville">
+          <option value="">Choisir la ville</option>
+          <option value="Agadir">Agadir</option>
+          <option value="Casablanca">Casablanca</option>
+          <option value="Marrakech">Marrakech</option>
+          <option value="Rabat">Rabat</option>
+          <option value="Fes">Fès</option>
+          <option value="Tanger">Tanger</option>
+        </select>
+      </div>
+    </div>
+    <div class="ctrl-row" style="flex-wrap:wrap">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🏥 Hospitalisation</div>
+        <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
+      </div>
+      <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
+      <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
+        <input type="date" id="hospi-date" placeholder="Date de retour">
+      </div>
+    </div>
+  </div>
+  <div class="ctrl-card">
+    <div class="section-label">Changement de prescription (médecin)</div>
     <div class="input-wrap">
       <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
       <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
@@ -410,56 +408,13 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
     </div>
-  </div>
-  <div class="ctrl-card">
-    <div class="section-label">Profil horaire</div>
-    <div class="input-wrap">
-      <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
-      <div class="time-grid">
-        <div class="time-group">
-          <label style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" id="check-matin" checked onchange="togglePlage('matin')"> 🌅 Matin — début
-          </label>
-          <input type="time" id="matin-debut" value="06:00">
-        </div>
-        <div class="time-group">
-          <label>🌅 Matin — fin</label>
-          <input type="time" id="matin-fin" value="11:00">
-        </div>
-        <div class="time-group">
-          <label style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" id="check-midi" checked onchange="togglePlage('midi')"> ☀️ Midi — début
-          </label>
-          <input type="time" id="midi-debut" value="11:00">
-        </div>
-        <div class="time-group">
-          <label>☀️ Midi — fin</label>
-          <input type="time" id="midi-fin" value="16:00">
-        </div>
-        <div class="time-group">
-          <label style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" id="check-soir" checked onchange="togglePlage('soir')"> 🌙 Soir — début
-          </label>
-          <input type="time" id="soir-debut" value="16:00">
-        </div>
-        <div class="time-group">
-          <label>🌙 Soir — fin</label>
-          <input type="time" id="soir-fin" value="22:00">
-        </div>
-      </div>
-      <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
+    <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Ou arrêter le traitement en cours :</div>
+      <button class="btn" onclick="arreterTraitement()" style="width:100%;color:var(--red-text);border-color:rgba(226,75,74,.3);background:var(--red-bg)">⛔ Arrêter le traitement actuel</button>
     </div>
   </div>
-  <div class="card">
-    <div class="section-label">Profil horaire actif</div>
-    <div id="profil-actif-medecin"><div class="loading">Chargement...</div></div>
-    <div style="margin-top:12px">
-      <div class="section-label">Historique des profils</div>
-      <div id="profils-historique"><div class="loading">Chargement...</div></div>
-    </div>
-  </div>
+  <div id="ctrl-status"></div>
 </div>
-
 
 <!-- ════════════ PAGE HISTORIQUE ════════════ -->
 <div class="page" id="page-historique">
@@ -479,35 +434,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 </div>
 
 <div class="toast" id="toast"></div>
-
-<!-- ════════════ OVERLAY PIN MÉDECIN ════════════ -->
-<div class="pin-overlay" id="pin-overlay">
-  <div class="pin-box">
-    <div class="pin-title">🔒 Accès médecin</div>
-    <div class="pin-sub">Entrez le code PIN pour continuer</div>
-    <div class="pin-dots">
-      <div class="pin-dot-ind" id="pd0"></div>
-      <div class="pin-dot-ind" id="pd1"></div>
-      <div class="pin-dot-ind" id="pd2"></div>
-      <div class="pin-dot-ind" id="pd3"></div>
-    </div>
-    <div class="pin-error" id="pin-error"></div>
-    <div class="pin-pad">
-      <button class="pin-key" onclick="pinKey('1')">1</button>
-      <button class="pin-key" onclick="pinKey('2')">2</button>
-      <button class="pin-key" onclick="pinKey('3')">3</button>
-      <button class="pin-key" onclick="pinKey('4')">4</button>
-      <button class="pin-key" onclick="pinKey('5')">5</button>
-      <button class="pin-key" onclick="pinKey('6')">6</button>
-      <button class="pin-key" onclick="pinKey('7')">7</button>
-      <button class="pin-key" onclick="pinKey('8')">8</button>
-      <button class="pin-key" onclick="pinKey('9')">9</button>
-      <button class="pin-key" onclick="pinKey('del')" style="font-size:13px">⌫</button>
-      <button class="pin-key" onclick="pinKey('0')">0</button>
-      <button class="pin-key" onclick="closePinOverlay()" style="font-size:11px;color:var(--text-secondary)">Annuler</button>
-    </div>
-  </div>
-</div>
 
 <script>
 const API = 'https://medicine-box-zk7r.onrender.com';
@@ -568,13 +494,6 @@ async function loadAll() {
 
   const hist = await api('/prises/historique');
   if (hist) renderHistPrises(hist);
-
-  const profils = await api('/intervalles/profils');
-  if (profils) {
-    renderContextesSpeciaux(profils);   // → page patient
-    renderProfilsHistorique(profils);   // → page médecin
-    renderProfilActifMedecin(profils);  // → page médecin lecture seule
-  }
 }
 
 // ══════════════════════════════════════════════════
@@ -738,12 +657,11 @@ function renderConfig(config) {
   document.getElementById('toggle-system').classList.toggle('on', config.system_on);
   document.getElementById('toggle-remplissage').classList.toggle('on', config.remplissage);
   document.getElementById('toggle-buzzer').classList.toggle('on', config.buzzer);
-  const hospiToggle = document.getElementById('toggle-hospitalisation');
-  if (hospiToggle) hospiToggle.classList.toggle('on', config.hospitalisation);
-  if (config.hospitalisation) {
-    const w = document.getElementById('hospi-date-wrap');
-    if (w) w.style.display = 'block';
-  }
+  document.getElementById('toggle-ramadan').classList.toggle('on', config.ramadan);
+  document.getElementById('toggle-hospitalisation').classList.toggle('on', config.hospitalisation);
+  if (config.ramadan) document.getElementById('ramadan-ville-wrap').style.display = 'block';
+  if (config.hospitalisation) document.getElementById('hospi-date-wrap').style.display = 'block';
+  if (config.ramadan_ville) document.getElementById('ramadan-ville').value = config.ramadan_ville;
 }
 
 async function toggleSystemFromCtrl() {
@@ -810,22 +728,21 @@ async function changerRx() {
   if (res) showToast(res.message || res.error);
 }
 
+async function arreterTraitement() {
+  if (!confirm('Confirmer l\'arrêt du traitement ? Le système sera mis en pause.')) return;
+  const res = await api('/config/arreter-traitement', { method: 'POST' });
+  if (res?.status === 'ok') {
+    showToast('⛔ ' + res.message);
+    loadAll();
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
 // ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
-let medecinUnlocked = false;
-let pendingTab = null;
-
 function switchTab(page, el) {
-  if (page === 'medecin' && !medecinUnlocked) {
-    pendingTab = { page, el };
-    openPinOverlay();
-    return;
-  }
-  _doSwitchTab(page, el);
-}
-
-function _doSwitchTab(page, el) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
@@ -958,214 +875,6 @@ function renderMedecinStatus(config) {
 
   banner.innerHTML = bannerHtml;
   badges.innerHTML = badgesHtml;
-}
-
-// ══════════════════════════════════════════════════
-// PIN MÉDECIN
-// ══════════════════════════════════════════════════
-const PIN_CODE = '1234';
-let pinBuffer = '';
-
-function openPinOverlay() {
-  pinBuffer = '';
-  updatePinDots();
-  document.getElementById('pin-error').textContent = '';
-  document.getElementById('pin-overlay').classList.add('open');
-}
-
-function closePinOverlay() {
-  document.getElementById('pin-overlay').classList.remove('open');
-  pinBuffer = '';
-  pendingTab = null;
-}
-
-function updatePinDots() {
-  for (let i = 0; i < 4; i++) {
-    document.getElementById('pd' + i).classList.toggle('filled', i < pinBuffer.length);
-  }
-}
-
-function pinKey(k) {
-  if (k === 'del') {
-    pinBuffer = pinBuffer.slice(0, -1);
-    updatePinDots();
-    return;
-  }
-  if (pinBuffer.length >= 4) return;
-  pinBuffer += k;
-  updatePinDots();
-  if (pinBuffer.length === 4) {
-    setTimeout(() => {
-      if (pinBuffer === PIN_CODE) {
-        medecinUnlocked = true;
-        document.getElementById('pin-overlay').classList.remove('open');
-        if (pendingTab) {
-          _doSwitchTab(pendingTab.page, pendingTab.el);
-          pendingTab = null;
-        }
-      } else {
-        document.getElementById('pin-error').textContent = 'Code incorrect, réessayez';
-        pinBuffer = '';
-        updatePinDots();
-      }
-    }, 200);
-  }
-}
-
-// ══════════════════════════════════════════════════
-// PROFILS HORAIRES
-// ══════════════════════════════════════════════════
-// ══════════════════════════════════════════════════
-// CONTEXTES SPÉCIAUX — page patient
-// ══════════════════════════════════════════════════
-function plageLabel(debut, fin, emoji, nom) {
-  if (!debut || debut.slice(0,5) === '00:00') return `<span class="profil-plage" style="opacity:.4;text-decoration:line-through">${emoji} ${nom} off</span>`;
-  return `<span class="profil-plage">${emoji} ${debut.slice(0,5)}–${fin.slice(0,5)}</span>`;
-}
-
-function renderContextesSpeciaux(profils) {
-  const div = document.getElementById('contextes-speciaux-list');
-  if (!Array.isArray(profils) || !profils.length) {
-    div.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">Aucun profil créé par le médecin</div>';
-    return;
-  }
-  div.innerHTML = profils.map(p => `
-    <div class="ctrl-row" style="border-bottom:0.5px solid var(--border);padding:10px 0">
-      <div class="ctrl-left">
-        <div class="ctrl-label">${p.label}</div>
-        <div class="ctrl-sub" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          ${plageLabel(p.matin_debut, p.matin_fin, '🌅', 'Matin')}
-          ${plageLabel(p.midi_debut,  p.midi_fin,  '☀️', 'Midi')}
-          ${plageLabel(p.soir_debut,  p.soir_fin,  '🌙', 'Soir')}
-        </div>
-      </div>
-      ${p.actif
-        ? '<span class="pill pill-ok"><span class="pill-dot"></span>Actif</span>'
-        : `<button class="btn btn-primary" style="font-size:11px;padding:5px 12px;flex-shrink:0" onclick="activerProfilPatient(${p.id})">Activer</button>`
-      }
-    </div>
-  `).join('');
-}
-
-async function activerProfilPatient(id) {
-  const res = await api(`/intervalles/profils/${id}/activer`, { method: 'POST' });
-  if (res?.success) {
-    showToast(`✅ Profil "${res.label}" activé`);
-    const profils = await api('/intervalles/profils');
-    if (profils) {
-      renderContextesSpeciaux(profils);
-      renderProfilsHistorique(profils);
-      renderProfilActifMedecin(profils);
-    }
-  } else {
-    showToast('Erreur : ' + (res?.error || 'inconnue'));
-  }
-}
-
-// ══════════════════════════════════════════════════
-// PROFILS HORAIRES — page médecin (lecture seule)
-// ══════════════════════════════════════════════════
-function renderProfilActifMedecin(profils) {
-  const div = document.getElementById('profil-actif-medecin');
-  if (!div) return;
-  const actif = Array.isArray(profils) ? profils.find(p => p.actif) : null;
-  if (!actif) {
-    div.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Aucun profil actif</div>';
-    return;
-  }
-  div.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="font-size:14px;font-weight:500">${actif.label}</div>
-      <span class="pill pill-ok"><span class="pill-dot"></span>Actif depuis le ${actif.date_debut}</span>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${plageLabel(actif.matin_debut, actif.matin_fin, '🌅', 'Matin')}
-      ${plageLabel(actif.midi_debut,  actif.midi_fin,  '☀️', 'Midi')}
-      ${plageLabel(actif.soir_debut,  actif.soir_fin,  '🌙', 'Soir')}
-    </div>
-  `;
-}
-
-function renderProfilsHistorique(profils) {
-  const div = document.getElementById('profils-historique');
-  if (!Array.isArray(profils) || !profils.length) {
-    div.innerHTML = '<div class="loading">Aucun profil</div>';
-    return;
-  }
-  div.innerHTML = profils.map(p => `
-    <div class="profil-card ${p.actif ? 'actif' : ''}">
-      <div class="profil-header">
-        <div class="profil-label">${p.actif ? '✅ ' : ''}${p.label}</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${p.actif
-            ? '<span class="pill pill-ok"><span class="pill-dot"></span>Actif</span>'
-            : `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="activerProfil(${p.id})">Réactiver</button>`
-          }
-        </div>
-      </div>
-      <div class="profil-plages">
-        <span class="profil-plage">🌅 ${p.matin_debut?.slice(0,5)}–${p.matin_fin?.slice(0,5)}</span>
-        <span class="profil-plage">☀️ ${p.midi_debut?.slice(0,5)}–${p.midi_fin?.slice(0,5)}</span>
-        <span class="profil-plage">🌙 ${p.soir_debut?.slice(0,5)}–${p.soir_fin?.slice(0,5)}</span>
-      </div>
-      <div style="font-size:10px;color:var(--text-tertiary);margin-top:6px">
-        Depuis le ${p.date_debut}${p.date_fin ? ' → ' + p.date_fin : ''} · ${p.nb_prises} prise(s)
-      </div>
-    </div>
-  `).join('');
-}
-
-function togglePlage(moment) {
-  const checked = document.getElementById('check-' + moment).checked;
-  const debut = document.getElementById(moment + '-debut');
-  const fin   = document.getElementById(moment + '-fin');
-  debut.disabled = !checked;
-  fin.disabled   = !checked;
-  debut.style.opacity = checked ? '1' : '0.35';
-  fin.style.opacity   = checked ? '1' : '0.35';
-  if (!checked) { debut.value = '00:00'; fin.value = '00:00'; }
-}
-
-async function creerProfil() {
-  const label = document.getElementById('profil-label').value.trim();
-  if (!label) { showToast('Entrez un label pour ce profil'); return; }
-  const data = {
-    label,
-    matin_debut: document.getElementById('matin-debut').value,
-    matin_fin:   document.getElementById('matin-fin').value,
-    midi_debut:  document.getElementById('midi-debut').value,
-    midi_fin:    document.getElementById('midi-fin').value,
-    soir_debut:  document.getElementById('soir-debut').value,
-    soir_fin:    document.getElementById('soir-fin').value,
-  };
-  const res = await api('/intervalles/profils', { method: 'POST', body: JSON.stringify(data) });
-  if (res?.success) {
-    showToast(`✅ Profil "${label}" créé et activé`);
-    document.getElementById('profil-label').value = '';
-    const profils = await api('/intervalles/profils');
-    if (profils) {
-      renderContextesSpeciaux(profils);
-      renderProfilsHistorique(profils);
-      renderProfilActifMedecin(profils);
-    }
-  } else {
-    showToast('Erreur : ' + (res?.error || 'inconnue'));
-  }
-}
-
-async function activerProfil(id) {
-  const res = await api(`/intervalles/profils/${id}/activer`, { method: 'POST' });
-  if (res?.success) {
-    showToast(`✅ Profil "${res.label}" réactivé`);
-    const profils = await api('/intervalles/profils');
-    if (profils) {
-      renderContextesSpeciaux(profils);
-      renderProfilsHistorique(profils);
-      renderProfilActifMedecin(profils);
-    }
-  } else {
-    showToast('Erreur : ' + (res?.error || 'inconnue'));
-  }
 }
 
 loadAll();
