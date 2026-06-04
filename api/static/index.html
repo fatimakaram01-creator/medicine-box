@@ -177,6 +177,32 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .setting-sub{font-size:11px;color:var(--text-secondary);margin-top:1px}
 .modal-footer{padding:10px 18px;border-top:0.5px solid var(--border);display:flex;justify-content:flex-end}
 @media(min-width:600px){.metrics-4{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* ── PIN Médecin ── */
+.pin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center}
+.pin-overlay.open{display:flex}
+.pin-box{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border-md);width:300px;max-width:92vw;padding:24px;text-align:center}
+.pin-title{font-size:15px;font-weight:500;margin-bottom:4px}
+.pin-sub{font-size:12px;color:var(--text-secondary);margin-bottom:18px}
+.pin-dots{display:flex;justify-content:center;gap:10px;margin-bottom:18px}
+.pin-dot-ind{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--border-md);background:transparent;transition:background .15s}
+.pin-dot-ind.filled{background:var(--teal);border-color:var(--teal)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.pin-key{height:44px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--bg);color:var(--text-primary);font-size:16px;font-weight:500;cursor:pointer;transition:background .15s}
+.pin-key:hover{background:var(--border)}
+.pin-error{font-size:12px;color:var(--red-text);min-height:16px;margin-bottom:4px}
+
+/* ── Profils horaires ── */
+.profil-card{background:var(--bg);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;border:1px solid var(--border)}
+.profil-card.actif{border-color:var(--teal);background:rgba(29,158,117,.07)}
+.profil-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.profil-label{font-size:13px;font-weight:500}
+.profil-plages{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-secondary)}
+.profil-plage{background:var(--surface);border:0.5px solid var(--border);border-radius:20px;padding:2px 8px}
+.time-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.time-group{display:flex;flex-direction:column;gap:4px}
+.time-group label{font-size:11px;color:var(--text-secondary)}
+.time-group input{padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--bg);color:var(--text-primary);font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
 </style>
 </head>
 <body>
@@ -329,6 +355,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="section-label">Dernières alertes</div>
     <div id="medecin-alertes"><div class="loading">Chargement...</div></div>
   </div>
+  <div class="card">
+    <div class="section-label">Profils horaires</div>
+    <div id="profils-historique"><div class="loading">Chargement...</div></div>
+  </div>
 </div>
 
 <!-- ════════════ PAGE CONTRÔLES ════════════ -->
@@ -409,6 +439,21 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
     </div>
   </div>
+  <div class="ctrl-card" id="ctrl-profil-horaire">
+    <div class="section-label">Profil horaire (médecin)</div>
+    <div class="input-wrap">
+      <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
+      <div class="time-grid">
+        <div class="time-group"><label>🌅 Matin — début</label><input type="time" id="matin-debut" value="06:00"></div>
+        <div class="time-group"><label>🌅 Matin — fin</label><input type="time" id="matin-fin" value="11:00"></div>
+        <div class="time-group"><label>☀️ Midi — début</label><input type="time" id="midi-debut" value="11:00"></div>
+        <div class="time-group"><label>☀️ Midi — fin</label><input type="time" id="midi-fin" value="16:00"></div>
+        <div class="time-group"><label>🌙 Soir — début</label><input type="time" id="soir-debut" value="16:00"></div>
+        <div class="time-group"><label>🌙 Soir — fin</label><input type="time" id="soir-fin" value="22:00"></div>
+      </div>
+      <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
+    </div>
+  </div>
   <div id="ctrl-status"></div>
 </div>
 
@@ -430,6 +475,35 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- ════════════ OVERLAY PIN MÉDECIN ════════════ -->
+<div class="pin-overlay" id="pin-overlay">
+  <div class="pin-box">
+    <div class="pin-title">🔒 Accès médecin</div>
+    <div class="pin-sub">Entrez le code PIN pour continuer</div>
+    <div class="pin-dots">
+      <div class="pin-dot-ind" id="pd0"></div>
+      <div class="pin-dot-ind" id="pd1"></div>
+      <div class="pin-dot-ind" id="pd2"></div>
+      <div class="pin-dot-ind" id="pd3"></div>
+    </div>
+    <div class="pin-error" id="pin-error"></div>
+    <div class="pin-pad">
+      <button class="pin-key" onclick="pinKey('1')">1</button>
+      <button class="pin-key" onclick="pinKey('2')">2</button>
+      <button class="pin-key" onclick="pinKey('3')">3</button>
+      <button class="pin-key" onclick="pinKey('4')">4</button>
+      <button class="pin-key" onclick="pinKey('5')">5</button>
+      <button class="pin-key" onclick="pinKey('6')">6</button>
+      <button class="pin-key" onclick="pinKey('7')">7</button>
+      <button class="pin-key" onclick="pinKey('8')">8</button>
+      <button class="pin-key" onclick="pinKey('9')">9</button>
+      <button class="pin-key" onclick="pinKey('del')" style="font-size:13px">⌫</button>
+      <button class="pin-key" onclick="pinKey('0')">0</button>
+      <button class="pin-key" onclick="closePinOverlay()" style="font-size:11px;color:var(--text-secondary)">Annuler</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const API = 'https://medicine-box-zk7r.onrender.com';
@@ -490,6 +564,9 @@ async function loadAll() {
 
   const hist = await api('/prises/historique');
   if (hist) renderHistPrises(hist);
+
+  const profils = await api('/intervalles/profils');
+  if (profils) renderProfilsHistorique(profils);
 }
 
 // ══════════════════════════════════════════════════
@@ -727,7 +804,19 @@ async function changerRx() {
 // ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
+let medecinUnlocked = false;
+let pendingTab = null;
+
 function switchTab(page, el) {
+  if ((page === 'medecin' || page === 'controles') && !medecinUnlocked) {
+    pendingTab = { page, el };
+    openPinOverlay();
+    return;
+  }
+  _doSwitchTab(page, el);
+}
+
+function _doSwitchTab(page, el) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
@@ -860,6 +949,124 @@ function renderMedecinStatus(config) {
 
   banner.innerHTML = bannerHtml;
   badges.innerHTML = badgesHtml;
+}
+
+// ══════════════════════════════════════════════════
+// PIN MÉDECIN
+// ══════════════════════════════════════════════════
+const PIN_CODE = '1234';
+let pinBuffer = '';
+
+function openPinOverlay() {
+  pinBuffer = '';
+  updatePinDots();
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('pin-overlay').classList.add('open');
+}
+
+function closePinOverlay() {
+  document.getElementById('pin-overlay').classList.remove('open');
+  pinBuffer = '';
+  pendingTab = null;
+}
+
+function updatePinDots() {
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('pd' + i).classList.toggle('filled', i < pinBuffer.length);
+  }
+}
+
+function pinKey(k) {
+  if (k === 'del') {
+    pinBuffer = pinBuffer.slice(0, -1);
+    updatePinDots();
+    return;
+  }
+  if (pinBuffer.length >= 4) return;
+  pinBuffer += k;
+  updatePinDots();
+  if (pinBuffer.length === 4) {
+    setTimeout(() => {
+      if (pinBuffer === PIN_CODE) {
+        medecinUnlocked = true;
+        document.getElementById('pin-overlay').classList.remove('open');
+        if (pendingTab) {
+          _doSwitchTab(pendingTab.page, pendingTab.el);
+          pendingTab = null;
+        }
+      } else {
+        document.getElementById('pin-error').textContent = 'Code incorrect, réessayez';
+        pinBuffer = '';
+        updatePinDots();
+      }
+    }, 200);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// PROFILS HORAIRES
+// ══════════════════════════════════════════════════
+function renderProfilsHistorique(profils) {
+  const div = document.getElementById('profils-historique');
+  if (!Array.isArray(profils) || !profils.length) {
+    div.innerHTML = '<div class="loading">Aucun profil</div>';
+    return;
+  }
+  div.innerHTML = profils.map(p => `
+    <div class="profil-card ${p.actif ? 'actif' : ''}">
+      <div class="profil-header">
+        <div class="profil-label">${p.actif ? '✅ ' : ''}${p.label}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          ${p.actif
+            ? '<span class="pill pill-ok"><span class="pill-dot"></span>Actif</span>'
+            : `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="activerProfil(${p.id})">Réactiver</button>`
+          }
+        </div>
+      </div>
+      <div class="profil-plages">
+        <span class="profil-plage">🌅 ${p.matin_debut?.slice(0,5)}–${p.matin_fin?.slice(0,5)}</span>
+        <span class="profil-plage">☀️ ${p.midi_debut?.slice(0,5)}–${p.midi_fin?.slice(0,5)}</span>
+        <span class="profil-plage">🌙 ${p.soir_debut?.slice(0,5)}–${p.soir_fin?.slice(0,5)}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text-tertiary);margin-top:6px">
+        Depuis le ${p.date_debut}${p.date_fin ? ' → ' + p.date_fin : ''} · ${p.nb_prises} prise(s)
+      </div>
+    </div>
+  `).join('');
+}
+
+async function creerProfil() {
+  const label = document.getElementById('profil-label').value.trim();
+  if (!label) { showToast('Entrez un label pour ce profil'); return; }
+  const data = {
+    label,
+    matin_debut: document.getElementById('matin-debut').value,
+    matin_fin:   document.getElementById('matin-fin').value,
+    midi_debut:  document.getElementById('midi-debut').value,
+    midi_fin:    document.getElementById('midi-fin').value,
+    soir_debut:  document.getElementById('soir-debut').value,
+    soir_fin:    document.getElementById('soir-fin').value,
+  };
+  const res = await api('/intervalles/profils', { method: 'POST', body: JSON.stringify(data) });
+  if (res?.success) {
+    showToast(`✅ Profil "${label}" créé et activé`);
+    document.getElementById('profil-label').value = '';
+    const profils = await api('/intervalles/profils');
+    if (profils) renderProfilsHistorique(profils);
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
+async function activerProfil(id) {
+  const res = await api(`/intervalles/profils/${id}/activer`, { method: 'POST' });
+  if (res?.success) {
+    showToast(`✅ Profil "${res.label}" réactivé`);
+    const profils = await api('/intervalles/profils');
+    if (profils) renderProfilsHistorique(profils);
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
 }
 
 loadAll();
