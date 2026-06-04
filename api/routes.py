@@ -391,6 +391,27 @@ def changement_rx(body: ChangementRx):
             cursor.close()
             return {"error": "Aucun patient trouvé"}
         patient_id = row[0]
+
+        # ── Désactiver l'ancienne prescription active ──
+        # Sans ça, l'ancienne et la nouvelle coexistent
+        # → le système génèrerait des prises en double
+        cursor.execute("""
+            UPDATE prescriptions
+            SET active = FALSE, date_fin = CURRENT_DATE
+            WHERE patient_id = %s AND active = TRUE;
+        """, (patient_id,))
+
+        # ── Supprimer les prises en_attente du jour ──
+        # Les prises générées par l'ancienne prescription
+        # ne sont plus valides → on les supprime
+        cursor.execute("""
+            DELETE FROM prises
+            WHERE patient_id = %s
+              AND statut = 'en_attente'
+              AND heure_prevue::date = CURRENT_DATE;
+        """, (patient_id,))
+
+        # ── Médicament : retrouver ou créer ──
         cursor.execute("SELECT id FROM medicaments WHERE nom = %s;", (body.medicament,))
         med_row = cursor.fetchone()
         if med_row:
@@ -398,6 +419,8 @@ def changement_rx(body: ChangementRx):
         else:
             cursor.execute("INSERT INTO medicaments (nom, dosage) VALUES (%s, %s) RETURNING id;", (body.medicament, body.dosage))
             medicament_id = cursor.fetchone()[0]
+
+        # ── Créer la nouvelle prescription ──
         date_debut = datetime.now().date()
         date_fin = date_debut + timedelta(days=body.duree_jours)
         cursor.execute("""
@@ -405,16 +428,73 @@ def changement_rx(body: ChangementRx):
             VALUES (%s, %s, %s, %s, true) RETURNING id;
         """, (patient_id, body.prescrit_par, date_debut, date_fin))
         prescription_id = cursor.fetchone()[0]
+
+        # ── Créer les doses selon le profil actif ──
+        # Les heures sont lues depuis _get_moments_config()
+        # pour être cohérentes avec les plages du profil actif
+        moments_config = _get_moments_config()
         moments = ['matin', 'midi', 'soir']
-        heures = ['08:30', '13:30', '20:30']
         for i in range(body.frequence):
+            moment = moments[i]
+            heure = moments_config.get(moment, '08:30:00')
             cursor.execute("""
                 INSERT INTO prescription_doses (prescription_id, medicament_id, moment, heure_prevue, quantite)
                 VALUES (%s, %s, %s, %s, 1);
-            """, (prescription_id, medicament_id, moments[i], heures[i]))
+            """, (prescription_id, medicament_id, moment, heure))
+
         conn.commit()
         cursor.close()
+        creer_alerte_systeme("contexte", f"Nouvelle prescription : {body.medicament} × {body.frequence}/jour")
         return {"status": "ok", "message": f"Prescription créée : {body.medicament} × {body.frequence}/jour", "prescription_id": prescription_id}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.post("/config/arreter-traitement")
+def arreter_traitement():
+    """
+    Arrête la prescription active du patient.
+    - Met date_fin = aujourd'hui sur la prescription active
+    - Supprime les prises en_attente du jour
+    - Met system_on = FALSE
+    - Crée une alerte pour le dashboard
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM patients LIMIT 1;")
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            return {"error": "Aucun patient trouvé"}
+        patient_id = row[0]
+
+        # ── Désactiver la prescription active ──
+        cursor.execute("""
+            UPDATE prescriptions
+            SET active = FALSE, date_fin = CURRENT_DATE
+            WHERE patient_id = %s AND active = TRUE;
+        """, (patient_id,))
+
+        # ── Supprimer les prises en_attente ──
+        cursor.execute("""
+            DELETE FROM prises
+            WHERE patient_id = %s
+              AND statut = 'en_attente'
+              AND heure_prevue::date = CURRENT_DATE;
+        """, (patient_id,))
+
+        conn.commit()
+        cursor.close()
+
+        # ── Mettre system_on = FALSE ──
+        config_state["system_on"] = False
+        sauvegarder_system_on(False)
+
+        creer_alerte_systeme("contexte", "Traitement arrêté par le médecin")
+        return {"status": "ok", "message": "Traitement arrêté — le système est mis en pause"}
     except Exception as e:
         return {"error": str(e)}
     finally:
