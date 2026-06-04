@@ -416,12 +416,36 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="input-wrap">
       <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
       <div class="time-grid">
-        <div class="time-group"><label>🌅 Matin — début</label><input type="time" id="matin-debut" value="06:00"></div>
-        <div class="time-group"><label>🌅 Matin — fin</label><input type="time" id="matin-fin" value="11:00"></div>
-        <div class="time-group"><label>☀️ Midi — début</label><input type="time" id="midi-debut" value="11:00"></div>
-        <div class="time-group"><label>☀️ Midi — fin</label><input type="time" id="midi-fin" value="16:00"></div>
-        <div class="time-group"><label>🌙 Soir — début</label><input type="time" id="soir-debut" value="16:00"></div>
-        <div class="time-group"><label>🌙 Soir — fin</label><input type="time" id="soir-fin" value="22:00"></div>
+        <div class="time-group">
+          <label style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="check-matin" checked onchange="togglePlage('matin')"> 🌅 Matin — début
+          </label>
+          <input type="time" id="matin-debut" value="06:00">
+        </div>
+        <div class="time-group">
+          <label>🌅 Matin — fin</label>
+          <input type="time" id="matin-fin" value="11:00">
+        </div>
+        <div class="time-group">
+          <label style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="check-midi" checked onchange="togglePlage('midi')"> ☀️ Midi — début
+          </label>
+          <input type="time" id="midi-debut" value="11:00">
+        </div>
+        <div class="time-group">
+          <label>☀️ Midi — fin</label>
+          <input type="time" id="midi-fin" value="16:00">
+        </div>
+        <div class="time-group">
+          <label style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="check-soir" checked onchange="togglePlage('soir')"> 🌙 Soir — début
+          </label>
+          <input type="time" id="soir-debut" value="16:00">
+        </div>
+        <div class="time-group">
+          <label>🌙 Soir — fin</label>
+          <input type="time" id="soir-fin" value="22:00">
+        </div>
       </div>
       <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
     </div>
@@ -994,6 +1018,11 @@ function pinKey(k) {
 // ══════════════════════════════════════════════════
 // CONTEXTES SPÉCIAUX — page patient
 // ══════════════════════════════════════════════════
+function plageLabel(debut, fin, emoji, nom) {
+  if (!debut || debut.slice(0,5) === '00:00') return `<span class="profil-plage" style="opacity:.4;text-decoration:line-through">${emoji} ${nom} off</span>`;
+  return `<span class="profil-plage">${emoji} ${debut.slice(0,5)}–${fin.slice(0,5)}</span>`;
+}
+
 function renderContextesSpeciaux(profils) {
   const div = document.getElementById('contextes-speciaux-list');
   if (!Array.isArray(profils) || !profils.length) {
@@ -1005,9 +1034,9 @@ function renderContextesSpeciaux(profils) {
       <div class="ctrl-left">
         <div class="ctrl-label">${p.label}</div>
         <div class="ctrl-sub" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
-          <span class="profil-plage">🌅 ${p.matin_debut?.slice(0,5)}–${p.matin_fin?.slice(0,5)}</span>
-          <span class="profil-plage">☀️ ${p.midi_debut?.slice(0,5)}–${p.midi_fin?.slice(0,5)}</span>
-          <span class="profil-plage">🌙 ${p.soir_debut?.slice(0,5)}–${p.soir_fin?.slice(0,5)}</span>
+          ${plageLabel(p.matin_debut, p.matin_fin, '🌅', 'Matin')}
+          ${plageLabel(p.midi_debut,  p.midi_fin,  '☀️', 'Midi')}
+          ${plageLabel(p.soir_debut,  p.soir_fin,  '🌙', 'Soir')}
         </div>
       </div>
       ${p.actif
@@ -1050,9 +1079,9 @@ function renderProfilActifMedecin(profils) {
       <span class="pill pill-ok"><span class="pill-dot"></span>Actif depuis le ${actif.date_debut}</span>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <span class="profil-plage">🌅 Matin ${actif.matin_debut?.slice(0,5)}–${actif.matin_fin?.slice(0,5)}</span>
-      <span class="profil-plage">☀️ Midi ${actif.midi_debut?.slice(0,5)}–${actif.midi_fin?.slice(0,5)}</span>
-      <span class="profil-plage">🌙 Soir ${actif.soir_debut?.slice(0,5)}–${actif.soir_fin?.slice(0,5)}</span>
+      ${plageLabel(actif.matin_debut, actif.matin_fin, '🌅', 'Matin')}
+      ${plageLabel(actif.midi_debut,  actif.midi_fin,  '☀️', 'Midi')}
+      ${plageLabel(actif.soir_debut,  actif.soir_fin,  '🌙', 'Soir')}
     </div>
   `;
 }
@@ -1084,6 +1113,17 @@ function renderProfilsHistorique(profils) {
       </div>
     </div>
   `).join('');
+}
+
+function togglePlage(moment) {
+  const checked = document.getElementById('check-' + moment).checked;
+  const debut = document.getElementById(moment + '-debut');
+  const fin   = document.getElementById(moment + '-fin');
+  debut.disabled = !checked;
+  fin.disabled   = !checked;
+  debut.style.opacity = checked ? '1' : '0.35';
+  fin.style.opacity   = checked ? '1' : '0.35';
+  if (!checked) { debut.value = '00:00'; fin.value = '00:00'; }
 }
 
 async function creerProfil() {
