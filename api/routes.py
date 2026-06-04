@@ -127,34 +127,6 @@ def get_prises_today():
         conn.close()
 
 
-@router.get("/stock")
-def get_stock():
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
-            cursor.close()
-            return {"error": "Aucun patient trouvé"}
-        patient_id = row[0]
-        cursor.execute("""
-            SELECT s.quantite, s.seuil_alerte, m.nom, m.dosage
-            FROM stock s JOIN medicaments m ON s.medicament_id = m.id
-            WHERE s.patient_id = %s;
-        """, (patient_id,))
-        row = cursor.fetchone()
-        if not row:
-            cursor.close()
-            return {"error": "Aucun stock trouvé"}
-        cursor.close()
-        return {"quantite": row[0], "seuil_alerte": row[1], "medicament": row[2], "dosage": row[3], "alerte": row[0] <= row[1]}
-    except Exception as e:
-        return {"error": str(e)}
-    finally:
-        conn.close()
-
-
 @router.get("/alertes")
 def get_alertes():
     conn = get_connection()
