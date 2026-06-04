@@ -217,10 +217,7 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="modal">
     <div class="modal-header"><div class="modal-title">Paramètres</div><div class="icon-btn" onclick="closeSettings()" style="border:none"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div></div>
     <div class="modal-body">
-      <div class="setting-row"><div><div class="setting-label">Mode sombre</div><div class="setting-sub">Interface en thème foncé</div></div><button class="toggle" id="dark-toggle" onclick="toggleDark()"></button></div>
-      <div class="setting-row"><div><div class="setting-label">Notifications push</div><div class="setting-sub">Alertes doses manquées</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      <div class="setting-row"><div><div class="setting-label">Rappel soir</div><div class="setting-sub">Rappel automatique à 19h30</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      <div class="setting-row"><div><div class="setting-label">Alerte stock bas</div><div class="setting-sub">Seuil : moins de 10 comprimés</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-sub">Seuil : moins de 10 comprimés</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
       <div class="setting-row"><div><div class="setting-label">ML automatique</div><div class="setting-sub">Exécution quotidienne à minuit</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
     </div>
     <div class="modal-footer"><button class="btn btn-primary" onclick="closeSettings()">Enregistrer</button></div>
@@ -565,42 +562,12 @@ function renderPatientPage(patients, prises, alertes) {
   const count = prises?.count || 0;
   const total = prises?.total || 3;
   const restantes = total - count;
-  const stockQte = stock?.quantite || '—';
-  const stockAlerte = stock?.alerte || false;
+  
 
   document.getElementById('patient-metrics').innerHTML = `
     <div class="metric"><div class="metric-label">Prises aujourd'hui</div><div class="metric-val">${count} <span style="font-size:15px;color:var(--text-tertiary);font-weight:400">/ ${total}</span></div><span class="pill ${restantes > 0 ? 'pill-warn' : 'pill-ok'}"><span class="pill-dot"></span>${restantes > 0 ? restantes + ' restante(s)' : 'Complet'}</span></div>
-    <div class="metric"><div class="metric-label">Stock restant</div><div class="metric-val">${stockQte} <span style="font-size:13px;color:var(--text-tertiary);font-weight:400">cpmt</span></div>${stockAlerte ? '<span class="pill pill-danger"><span class="pill-dot"></span>Stock bas</span>' : '<span class="pill pill-ok"><span class="pill-dot"></span>OK</span>'}</div>
-    <div class="metric"><div class="metric-label">Médicament</div><div class="metric-val" style="font-size:14px">${stock?.medicament || '—'}</div><div class="metric-sub">${stock?.dosage || ''}</div></div>
-  `;
-
-  // Doses du jour
-  const dosesDiv = document.getElementById('doses-today');
-  if (prises?.prises?.length) {
-    dosesDiv.innerHTML = prises.prises.map(pr => `
-      <div class="tl-row">
-        <div class="tl-dot" style="background:${dotForStatut(pr.statut)}"></div>
-        <div class="tl-info">
-          <div class="tl-name">${pr.moment.charAt(0).toUpperCase() + pr.moment.slice(1)}</div>
-          <div class="tl-sub">${pr.statut === 'pris' && pr.poids_avant ? `${pr.poids_avant}g → ${pr.poids_apres}g · Δ ${(pr.poids_avant - pr.poids_apres).toFixed(1)}g` : pr.statut === 'en_attente' ? 'En attente de prise' : 'Aucune prise détectée'}</div>
-        </div>
-        <div class="tl-right">
-          <div class="tl-time">${pr.heure_reelle ? formatHeure(pr.heure_reelle) : formatHeure(pr.heure_prevue)}</div>
-          ${pillForStatut(pr.statut)}
-        </div>
-      </div>
-    `).join('');
-  } else {
-    dosesDiv.innerHTML = '<div class="loading">Aucune prise prévue aujourd\'hui</div>';
-  }
-
-  // Alertes patient
-  const alertDiv = document.getElementById('patient-alerts');
-  if (Array.isArray(alertes)) {
-    const recent = alertes.slice(0, 3);
-    alertDiv.innerHTML = recent.map(a => {
-      const cls = a.type === 'dose_manquee' ? 'warn' : a.type === 'erreur_dispositif' ? 'danger' : 'info';
-      return `<div class="alert alert-${cls}"><div class="alert-icon">!</div><div><div class="alert-title">${a.type.replace('_', ' ')}</div><div class="alert-body">${a.message}</div></div></div>`;
+    
+    `;
     }).join('');
   }
 
@@ -642,7 +609,7 @@ function renderMedecinPage(patients, prises, alertes, observance) {
   document.getElementById('medecin-metrics').innerHTML = `
     <div class="metric"><div class="metric-label">Observance 7j</div><div class="metric-val">${obs}<span style="font-size:13px;color:var(--text-tertiary);font-weight:400">%</span></div><span class="pill ${obs >= 80 ? 'pill-ok' : obs >= 60 ? 'pill-warn' : 'pill-danger'}"><span class="pill-dot"></span>${obs >= 80 ? 'Bonne' : obs >= 60 ? 'Moyenne' : 'Faible'}</span></div>
     <div class="metric"><div class="metric-label">Doses manquées</div><div class="metric-val">${manquees}</div><div class="metric-sub">dernières alertes</div></div>
-    <div class="metric"><div class="metric-label">Stock</div><div class="metric-val">${stock?.quantite || '—'}</div>${stock?.alerte ? '<span class="pill pill-danger"><span class="pill-dot"></span>Renouveler</span>' : '<span class="pill pill-ok"><span class="pill-dot"></span>OK</span>'}</div>
+    
     <div class="metric"><div class="metric-label">Médecin</div><div class="metric-val" style="font-size:14px">${p.medecin || 'Dr. —'}</div></div>
   `;
 
@@ -664,7 +631,7 @@ function renderMedecinPage(patients, prises, alertes, observance) {
     <div class="detail-grid">
       <div class="detail-item"><div class="detail-item-label">Nom</div><div class="detail-item-val">${p.prenom} ${p.nom}</div></div>
       <div class="detail-item"><div class="detail-item-label">ID</div><div class="detail-item-val" style="font-family:'DM Mono',monospace">#${String(p.id).padStart(3,'0')}</div></div>
-      <div class="detail-item"><div class="detail-item-label">Médicament</div><div class="detail-item-val">${stock?.medicament || '—'} ${stock?.dosage || ''}</div></div>
+      
       <div class="detail-item"><div class="detail-item-label">Médecin</div><div class="detail-item-val">${p.medecin || '—'}</div></div>
     </div>
   `;
