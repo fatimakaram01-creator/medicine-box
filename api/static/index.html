@@ -99,11 +99,11 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .alert-warn .alert-title{color:var(--amber-text)}
 .alert-info .alert-title{color:var(--blue-text)}
 .alert-ok .alert-title{color:var(--green-text)}
-.alert-body{padding-top:env(safe-area-inset-top);font-size:12px;opacity:.85}
-.alert-danger .alert-body{padding-top:env(safe-area-inset-top);color:var(--red-text)}
-.alert-warn .alert-body{padding-top:env(safe-area-inset-top);color:var(--amber-text)}
-.alert-info .alert-body{padding-top:env(safe-area-inset-top);color:var(--blue-text)}
-.alert-ok .alert-body{padding-top:env(safe-area-inset-top);color:var(--green-text)}
+.alert-body{font-size:12px;opacity:.85}
+.alert-danger .alert-body{color:var(--red-text)}
+.alert-warn .alert-body{color:var(--amber-text)}
+.alert-info .alert-body{color:var(--blue-text)}
+.alert-ok .alert-body{color:var(--green-text)}
 .two-col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:12px}
 .page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
 .page-header-title{font-size:17px;font-weight:500;margin-bottom:2px}
@@ -123,7 +123,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .sub-tab.active{color:var(--text-primary);border-bottom-color:var(--text-primary);font-weight:500}
 .sub-page{display:none}
 .sub-page.active{display:block}
-/* ── Contrôles ── */
 .ctrl-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px}
 .ctrl-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 0;border-bottom:0.5px solid var(--border)}
 .ctrl-row:last-child{border-bottom:none}
@@ -165,14 +164,14 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .notif-item:last-child{border-bottom:none}
 .notif-item.unread{background:var(--blue-bg)}
 .notif-item-title{font-size:12px;font-weight:500;color:var(--text-primary);margin-bottom:2px}
-.notif-item-body{padding-top:env(safe-area-inset-top);font-size:11px;color:var(--text-secondary)}
+.notif-item-body{font-size:11px;color:var(--text-secondary)}
 .notif-item-time{font-size:10px;color:var(--text-tertiary);margin-top:3px;font-family:'DM Mono',monospace}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.3);z-index:300;align-items:center;justify-content:center}
 .modal-overlay.open{display:flex}
 .modal{background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border-md);width:340px;max-width:95vw}
 .modal-header{padding:14px 18px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .modal-title{font-size:14px;font-weight:500}
-.modal-body{padding-top:env(safe-area-inset-top);padding:14px 18px;display:flex;flex-direction:column;gap:14px}
+.modal-body{padding:14px 18px;display:flex;flex-direction:column;gap:14px}
 .setting-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .setting-label{font-size:13px;color:var(--text-primary)}
 .setting-sub{font-size:11px;color:var(--text-secondary);margin-top:1px}
@@ -206,13 +205,11 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   </div>
 </nav>
 
-<!-- NOTIFICATION PANEL -->
 <div class="notif-panel" id="notif-panel">
   <div class="notif-header"><div class="notif-header-title">Notifications</div><span class="pill pill-danger" id="notif-count-pill" style="font-size:10px">0 nouvelles</span></div>
   <div id="notif-list"></div>
 </div>
 
-<!-- SETTINGS MODAL -->
 <div class="modal-overlay" id="settings-modal" onclick="closeSettingsOutside(event)">
   <div class="modal">
     <div class="modal-header"><div class="modal-title">Paramètres</div><div class="icon-btn" onclick="closeSettings()" style="border:none"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div></div>
@@ -226,37 +223,27 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   </div>
 </div>
 
-<!-- BANDEAU WIFI — visible quand ESP32 non connecté -->
 <div id="wifi-banner" style="display:none;background:var(--red-bg);border-bottom:1px solid rgba(226,75,74,.3);padding:10px 16px;cursor:pointer;text-align:center" onclick="openWifiGuide()">
   <div style="font-size:13px;font-weight:500;color:var(--red-text)">⚠️ Boîte non connectée</div>
   <div style="font-size:11px;color:var(--red-text);opacity:.8">Appuyez ici pour configurer le WiFi</div>
 </div>
 
-<!-- BANDEAU CONNECTÉ -->
 <div id="connected-banner" style="display:none;background:var(--green-bg);border-bottom:1px solid rgba(39,80,10,.2);padding:10px 16px;text-align:center">
   <div style="font-size:13px;font-weight:500;color:var(--green-text)">✅ Boîte connectée</div>
   <div style="font-size:11px;color:var(--green-text);opacity:.8">Système actif et prêt</div>
 </div>
 
-<!-- POPUP GUIDE WIFI -->
 <div class="modal-overlay" id="wifi-guide-modal" onclick="closeWifiGuideOutside(event)">
   <div class="modal" style="width:380px">
     <div class="modal-header">
       <div class="modal-title">📶 Configurer la Medicine Box</div>
-      <div class="icon-btn" onclick="closeWifiGuide()" style="border:none">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      </div>
+      <div class="icon-btn" onclick="closeWifiGuide()" style="border:none"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
     </div>
     <div class="modal-body" style="gap:0">
-      <!-- Étape 1 -->
       <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:0.5px solid var(--border)">
         <div style="min-width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">1</div>
-        <div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:2px">Ouvrez les réglages WiFi</div>
-          <div style="font-size:12px;color:var(--text-secondary)">Allez dans les paramètres WiFi de votre téléphone ou ordinateur</div>
-        </div>
+        <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">Ouvrez les réglages WiFi</div><div style="font-size:12px;color:var(--text-secondary)">Allez dans les paramètres WiFi de votre téléphone ou ordinateur</div></div>
       </div>
-      <!-- Étape 2 -->
       <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:0.5px solid var(--border)">
         <div style="min-width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">2</div>
         <div>
@@ -271,13 +258,9 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
           </div>
         </div>
       </div>
-      <!-- Étape 3 -->
       <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 0">
         <div style="min-width:28px;height:28px;border-radius:50%;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600">3</div>
-        <div>
-          <div style="font-size:13px;font-weight:500;margin-bottom:2px">Configurez votre WiFi</div>
-          <div style="font-size:12px;color:var(--text-secondary)">Une fois connecté au réseau MedicineBox-Setup, appuyez sur le bouton ci-dessous pour choisir votre WiFi</div>
-        </div>
+        <div><div style="font-size:13px;font-weight:500;margin-bottom:2px">Configurez votre WiFi</div><div style="font-size:12px;color:var(--text-secondary)">Une fois connecté au réseau MedicineBox-Setup, appuyez sur le bouton ci-dessous</div></div>
       </div>
     </div>
     <div class="modal-footer" style="flex-direction:column;gap:8px">
@@ -287,7 +270,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   </div>
 </div>
 
-<!-- BANDEAU SYSTÈME OFF — visible quand système arrêté -->
 <div id="system-banner" style="display:none;background:var(--amber-bg);border-bottom:1px solid rgba(239,159,39,.3);padding:10px 16px;display:flex;align-items:center;justify-content:space-between">
   <div>
     <div style="font-size:13px;font-weight:500;color:var(--amber-text)">Système en pause</div>
@@ -296,7 +278,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <button class="btn btn-primary" onclick="toggleSystem(true)" style="font-size:11px;padding:5px 12px">Démarrer</button>
 </div>
 
-<!-- BANDEAU SYSTÈME ON — petit bandeau vert discret -->
 <div id="system-on-banner" style="display:none;background:var(--green-bg);border-bottom:1px solid rgba(99,153,34,.2);padding:6px 16px;display:flex;align-items:center;justify-content:space-between">
   <div style="font-size:12px;color:var(--green-text);font-weight:500">✓ Système actif</div>
   <button style="background:none;border:none;font-size:11px;color:var(--green-text);cursor:pointer;text-decoration:underline" onclick="toggleSystem(false)">Mettre en pause</button>
@@ -328,7 +309,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 
 <!-- ════════════ PAGE MÉDECIN ════════════ -->
 <div class="page" id="page-medecin">
-  <!-- Bandeau état système pour le médecin -->
   <div id="medecin-status-banner"></div>
   <div class="page-header">
     <div><div class="page-header-title">Dashboard médecin</div><div class="page-header-sub" id="medecin-sub"></div></div>
@@ -356,20 +336,16 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="page-header">
     <div><div class="page-header-title">Contrôles du système</div><div class="page-header-sub">Gérer les modes de la Medicine Box</div></div>
   </div>
-
-  <!-- Système ON/OFF -->
   <div class="ctrl-card" style="border:1.5px solid var(--teal)">
     <div class="section-label">Système</div>
     <div class="ctrl-row">
       <div class="ctrl-left">
         <div class="ctrl-label">⚡ Système actif</div>
-        <div class="ctrl-sub">Active ou met en pause le suivi des prises, les alertes et la collecte de données. Quand le système est en pause, aucune donnée n'est générée.</div>
+        <div class="ctrl-sub">Active ou met en pause le suivi des prises, les alertes et la collecte de données.</div>
       </div>
       <button class="toggle" id="toggle-system" onclick="toggleSystemFromCtrl()"></button>
     </div>
   </div>
-
-  <!-- Mode remplissage -->
   <div class="ctrl-card">
     <div class="section-label">Modes de fonctionnement</div>
     <div class="ctrl-row">
@@ -387,8 +363,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
     </div>
   </div>
-
-  <!-- Mode Ramadan -->
   <div class="ctrl-card">
     <div class="section-label">Contextes spéciaux</div>
     <div class="ctrl-row" style="flex-wrap:wrap">
@@ -420,8 +394,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       </div>
     </div>
   </div>
-
-  <!-- Changement Rx -->
   <div class="ctrl-card">
     <div class="section-label">Changement de prescription (médecin)</div>
     <div class="input-wrap">
@@ -437,7 +409,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
     </div>
   </div>
-
   <div id="ctrl-status"></div>
 </div>
 
@@ -458,30 +429,17 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   </div>
 </div>
 
-<!-- Toast notification -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ══════════════════════════════════════════════════
-// CONFIG
-// ══════════════════════════════════════════════════
 const API = 'https://medicine-box-zk7r.onrender.com';
-const REFRESH_MS = 30000; // auto-refresh toutes les 30 secondes
+const REFRESH_MS = 30000;
 
-// ══════════════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════════════
 async function api(path, opts = {}) {
   try {
-    const r = await fetch(API + path, {
-      headers: { 'Content-Type': 'application/json' },
-      ...opts
-    });
+    const r = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
     return await r.json();
-  } catch (e) {
-    console.error('API error:', path, e);
-    return null;
-  }
+  } catch (e) { console.error('API error:', path, e); return null; }
 }
 
 function formatDate(d) {
@@ -492,20 +450,13 @@ function formatDate(d) {
 
 function formatHeure(str) {
   if (!str || str === 'None') return '—';
-  try {
-    const d = new Date(str);
-    return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  } catch { return str.substring(11, 16); }
-}
-
-function jourSemaine(d) {
-  return ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'][d.getDay()];
+  try { const d = new Date(str); return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }); }
+  catch { return str.substring(11, 16); }
 }
 
 function showToast(msg) {
   const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
+  t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2500);
 }
 
@@ -521,9 +472,6 @@ function dotForStatut(s) {
   return 'var(--amber-dot)';
 }
 
-// ══════════════════════════════════════════════════
-// CHARGEMENT DONNÉES
-// ══════════════════════════════════════════════════
 async function loadAll() {
   const [patients, prises, alertes, observance, config] = await Promise.all([
     api('/patients'),
@@ -533,25 +481,21 @@ async function loadAll() {
     api('/config/status'),
   ]);
 
-  renderPatientPage(patients, prises , alertes);
+  renderPatientPage(patients, prises, alertes, observance);
   renderMedecinPage(patients, prises, alertes, observance);
   renderHistorique(alertes);
   renderNotifications(alertes);
   renderBanners(config);
-  if (config) {
-    renderConfig(config);
-    renderMedecinStatus(config);
-  }
+  if (config) { renderConfig(config); renderMedecinStatus(config); }
 
-  // Charger l'historique séparément
   const hist = await api('/prises/historique');
   if (hist) renderHistPrises(hist);
 }
 
 // ══════════════════════════════════════════════════
-// PAGE PATIENT
+// PAGE PATIENT — avec 3 métriques : Prises + Observance + Risque ML
 // ══════════════════════════════════════════════════
-function renderPatientPage(patients, prises, alertes) {
+function renderPatientPage(patients, prises, alertes, observance) {
   const now = new Date();
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '' };
 
@@ -559,15 +503,29 @@ function renderPatientPage(patients, prises, alertes) {
   document.getElementById('patient-date').textContent = formatDate(now);
   document.getElementById('patient-status').textContent = prises ? 'Tout va bien' : 'Hors ligne';
 
-  // Metrics
   const count = prises?.count || 0;
   const total = prises?.total || 3;
   const restantes = total - count;
+  const obs = observance?.pourcentage || 0;
 
   document.getElementById('patient-metrics').innerHTML = `
-    <div class="metric"><div class="metric-label">Prises aujourd'hui</div><div class="metric-val">${count} <span style="font-size:15px;color:var(--text-tertiary);font-weight:400">/ ${total}</span></div><span class="pill ${restantes > 0 ? 'pill-warn' : 'pill-ok'}"><span class="pill-dot"></span>${restantes > 0 ? restantes + ' restante(s)' : 'Complet'}</span></div>  `;
+    <div class="metric">
+      <div class="metric-label">Prises aujourd'hui</div>
+      <div class="metric-val">${count} <span style="font-size:15px;color:var(--text-tertiary);font-weight:400">/ ${total}</span></div>
+      <span class="pill ${restantes > 0 ? 'pill-warn' : 'pill-ok'}"><span class="pill-dot"></span>${restantes > 0 ? restantes + ' restante(s)' : 'Complet'}</span>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Observance 7j</div>
+      <div class="metric-val">${obs}<span style="font-size:14px;color:var(--text-tertiary);font-weight:400">%</span></div>
+      <span class="pill ${obs >= 80 ? 'pill-ok' : obs >= 60 ? 'pill-warn' : 'pill-danger'}"><span class="pill-dot"></span>${obs >= 80 ? 'Bonne' : obs >= 60 ? 'Moyenne' : 'Faible'}</span>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Risque ML</div>
+      <div class="metric-val">—</div>
+      <span class="pill pill-ok"><span class="pill-dot"></span>Faible</span>
+    </div>
+  `;
 
-  // Doses du jour
   const dosesDiv = document.getElementById('doses-today');
   if (prises?.prises?.length) {
     dosesDiv.innerHTML = prises.prises.map(pr => `
@@ -587,17 +545,14 @@ function renderPatientPage(patients, prises, alertes) {
     dosesDiv.innerHTML = '<div class="loading">Aucune prise prévue aujourd\'hui</div>';
   }
 
-  // Alertes patient
   const alertDiv = document.getElementById('patient-alerts');
   if (Array.isArray(alertes)) {
-    const recent = alertes.slice(0, 3);
-    alertDiv.innerHTML = recent.map(a => {
+    alertDiv.innerHTML = alertes.slice(0, 3).map(a => {
       const cls = a.type === 'dose_manquee' ? 'warn' : a.type === 'erreur_dispositif' ? 'danger' : 'info';
       return `<div class="alert alert-${cls}"><div class="alert-icon">!</div><div><div class="alert-title">${a.type.replace('_', ' ')}</div><div class="alert-body">${a.message}</div></div></div>`;
     }).join('');
   }
 
-  // Compartiments semaine
   renderCompGrid(prises);
 }
 
@@ -611,13 +566,8 @@ function renderCompGrid(prises) {
     const isToday = i === todayIdx;
     const isPast = i < todayIdx;
     let dot = 'var(--gray-dot)', status = '—';
-    if (isToday && prises) {
-      dot = 'var(--blue-dot)';
-      status = `${prises.count}/${prises.total}`;
-    } else if (isPast) {
-      dot = 'var(--green-dot)';
-      status = '3/3';
-    }
+    if (isToday && prises) { dot = 'var(--blue-dot)'; status = `${prises.count}/${prises.total}`; }
+    else if (isPast) { dot = 'var(--green-dot)'; status = '3/3'; }
     return `<div class="comp ${isToday ? 'today' : ''}"><div class="comp-day">${j}</div><div class="comp-dot" style="background:${dot}"></div><div class="comp-status">${status}</div></div>`;
   }).join('');
 }
@@ -638,7 +588,6 @@ function renderMedecinPage(patients, prises, alertes, observance) {
     <div class="metric"><div class="metric-label">Médecin</div><div class="metric-val" style="font-size:14px">${p.medecin || 'Dr. —'}</div></div>
   `;
 
-  // Observance bars
   if (observance?.par_jour) {
     const jours = Object.entries(observance.par_jour).sort((a, b) => a[0].localeCompare(b[0]));
     const joursNoms = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
@@ -651,7 +600,6 @@ function renderMedecinPage(patients, prises, alertes, observance) {
     }).join('');
   }
 
-  // Patient info
   document.getElementById('patient-info').innerHTML = `
     <div class="detail-grid">
       <div class="detail-item"><div class="detail-item-label">Nom</div><div class="detail-item-val">${p.prenom} ${p.nom}</div></div>
@@ -660,7 +608,6 @@ function renderMedecinPage(patients, prises, alertes, observance) {
     </div>
   `;
 
-  // Alertes médecin
   if (Array.isArray(alertes)) {
     document.getElementById('medecin-alertes').innerHTML = alertes.slice(0, 5).map(a => {
       const pillCls = a.type === 'dose_manquee' ? 'pill-warn' : a.type === 'erreur_dispositif' ? 'pill-danger' : 'pill-info';
@@ -674,10 +621,7 @@ function renderMedecinPage(patients, prises, alertes, observance) {
 // ══════════════════════════════════════════════════
 function renderHistPrises(hist) {
   const div = document.getElementById('hist-prises');
-  if (!Array.isArray(hist) || !hist.length) {
-    div.innerHTML = '<div class="loading">Aucune prise enregistrée</div>';
-    return;
-  }
+  if (!Array.isArray(hist) || !hist.length) { div.innerHTML = '<div class="loading">Aucune prise enregistrée</div>'; return; }
   div.innerHTML = hist.map(pr => `
     <div class="tl-row">
       <div class="tl-dot" style="background:${dotForStatut(pr.statut)}"></div>
@@ -726,11 +670,7 @@ async function toggleConfig(mode) {
   const btn = document.getElementById('toggle-' + mode);
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
-
-  const res = await api('/config/' + mode, {
-    method: 'POST',
-    body: JSON.stringify({ enabled })
-  });
+  const res = await api('/config/' + mode, { method: 'POST', body: JSON.stringify({ enabled }) });
   if (res) showToast(res.message);
 }
 
@@ -739,24 +679,16 @@ async function toggleRamadan() {
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
   document.getElementById('ramadan-ville-wrap').style.display = enabled ? 'block' : 'none';
-
   if (enabled) {
-    // Attendre que l'utilisateur choisisse une ville
     const sel = document.getElementById('ramadan-ville');
     sel.onchange = async () => {
       if (sel.value) {
-        const res = await api('/config/ramadan', {
-          method: 'POST',
-          body: JSON.stringify({ enabled: true, ville: sel.value })
-        });
+        const res = await api('/config/ramadan', { method: 'POST', body: JSON.stringify({ enabled: true, ville: sel.value }) });
         if (res) showToast(res.message);
       }
     };
   } else {
-    const res = await api('/config/ramadan', {
-      method: 'POST',
-      body: JSON.stringify({ enabled: false })
-    });
+    const res = await api('/config/ramadan', { method: 'POST', body: JSON.stringify({ enabled: false }) });
     if (res) showToast(res.message);
   }
 }
@@ -766,23 +698,16 @@ async function toggleHospitalisation() {
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
   document.getElementById('hospi-date-wrap').style.display = enabled ? 'block' : 'none';
-
   if (enabled) {
     const input = document.getElementById('hospi-date');
     input.onchange = async () => {
       if (input.value) {
-        const res = await api('/config/hospitalisation', {
-          method: 'POST',
-          body: JSON.stringify({ enabled: true, date_retour: input.value })
-        });
+        const res = await api('/config/hospitalisation', { method: 'POST', body: JSON.stringify({ enabled: true, date_retour: input.value }) });
         if (res) showToast(res.message);
       }
     };
   } else {
-    const res = await api('/config/hospitalisation', {
-      method: 'POST',
-      body: JSON.stringify({ enabled: false })
-    });
+    const res = await api('/config/hospitalisation', { method: 'POST', body: JSON.stringify({ enabled: false }) });
     if (res) showToast(res.message);
   }
 }
@@ -795,10 +720,7 @@ async function changerRx() {
     prescrit_par: document.getElementById('rx-medecin').value,
     duree_jours: parseInt(document.getElementById('rx-duree').value)
   };
-  const res = await api('/config/changement-rx', {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
+  const res = await api('/config/changement-rx', { method: 'POST', body: JSON.stringify(data) });
   if (res) showToast(res.message || res.error);
 }
 
@@ -850,32 +772,20 @@ function renderNotifications(alertes) {
   }).join('') || '<div class="notif-item"><div class="notif-item-body">Aucune notification</div></div>';
 }
 
-// ══════════════════════════════════════════════════
-// SETTINGS MODAL
-// ══════════════════════════════════════════════════
 function openSettings() { document.getElementById('settings-modal').classList.add('open'); closeNotif(); }
 function closeSettings() { document.getElementById('settings-modal').classList.remove('open'); }
 function closeSettingsOutside(e) { if (e.target === document.getElementById('settings-modal')) closeSettings(); }
 
-// ══════════════════════════════════════════════════
-// GUIDE WIFI POPUP
-// ══════════════════════════════════════════════════
 function openWifiGuide() { document.getElementById('wifi-guide-modal').classList.add('open'); }
 function closeWifiGuide() { document.getElementById('wifi-guide-modal').classList.remove('open'); }
 function closeWifiGuideOutside(e) { if (e.target === document.getElementById('wifi-guide-modal')) closeWifiGuide(); }
 
-// ══════════════════════════════════════════════════
-// SYSTÈME ON/OFF + WIFI BANNER + MÉDECIN STATUS
-// ══════════════════════════════════════════════════
 async function toggleSystem(enabled) {
-  const res = await api('/config/system', {
-    method: 'POST',
-    body: JSON.stringify({ enabled })
-  });
+  const res = await api('/config/system', { method: 'POST', body: JSON.stringify({ enabled }) });
   if (res) {
     showToast(res.message);
-    if (res.status === 'error') return; // prescription expirée
-    loadAll(); // rafraîchir tout
+    if (res.status === 'error') return;
+    loadAll();
   }
 }
 
@@ -884,7 +794,6 @@ function renderBanners(config) {
   const systemBanner = document.getElementById('system-banner');
   const systemOnBanner = document.getElementById('system-on-banner');
 
-  // Si pas de config (backend non joignable) → afficher uniquement le bandeau WiFi
   if (!config) {
     wifiBanner.style.display = 'block';
     systemBanner.style.display = 'none';
@@ -892,7 +801,6 @@ function renderBanners(config) {
     return;
   }
 
-  // Bandeau WiFi — rouge si ESP32 non connecté
   if (!config.esp32_connected) {
     wifiBanner.style.display = 'block';
     const connBanner2 = document.getElementById('connected-banner');
@@ -903,7 +811,6 @@ function renderBanners(config) {
     if (connBanner) connBanner.style.display = 'block';
   }
 
-  // Bandeau système (seulement si WiFi OK, sinon on ne montre que le WiFi)
   if (config.esp32_connected && config.system_on) {
     systemBanner.style.display = 'none';
     systemOnBanner.style.display = 'flex';
@@ -911,7 +818,6 @@ function renderBanners(config) {
     systemBanner.style.display = 'flex';
     systemOnBanner.style.display = 'none';
   } else {
-    // ESP32 pas connecté → pas de bandeau système, juste le WiFi
     systemBanner.style.display = 'none';
     systemOnBanner.style.display = 'none';
   }
@@ -925,34 +831,29 @@ function renderMedecinStatus(config) {
   let bannerHtml = '';
   let badgesHtml = '';
 
-  // Système ON/OFF
   if (config.system_on) {
     badgesHtml += '<span class="pill pill-ok"><span class="pill-dot"></span>Système actif</span>';
   } else {
-    bannerHtml += '<div class="alert alert-danger" style="margin-bottom:12px"><div class="alert-icon">!</div><div><div class="alert-title">Système arrêté</div><div class="alert-body">Le patient a mis le système en pause. Aucune donnée n\'est collectée.</div></div></div>';
+    bannerHtml += '<div class="alert alert-danger" style="margin-bottom:12px"><div class="alert-icon">!</div><div><div class="alert-title">Système arrêté</div><div class="alert-body">Le patient a mis le système en pause.</div></div></div>';
     badgesHtml += '<span class="pill pill-danger"><span class="pill-dot"></span>Système arrêté</span>';
   }
 
-  // ESP32
   if (config.esp32_connected) {
     badgesHtml += '<span class="pill pill-info"><span class="pill-dot"></span>ESP32 connecté</span>';
   } else {
     badgesHtml += '<span class="pill pill-danger"><span class="pill-dot"></span>ESP32 déconnecté</span>';
   }
 
-  // Ramadan
   if (config.ramadan) {
     bannerHtml += `<div class="alert alert-warn" style="margin-bottom:12px"><div class="alert-icon">!</div><div><div class="alert-title">Mode Ramadan actif</div><div class="alert-body">Ville : ${config.ramadan_ville || '—'} — dose midi suspendue</div></div></div>`;
     badgesHtml += '<span class="pill pill-warn"><span class="pill-dot"></span>Ramadan</span>';
   }
 
-  // Hospitalisation
   if (config.hospitalisation) {
-    bannerHtml += '<div class="alert alert-info" style="margin-bottom:12px"><div class="alert-icon">!</div><div><div class="alert-title">Hospitalisation</div><div class="alert-body">Le système est suspendu — les médicaments sont gérés par l\'hôpital.</div></div></div>';
+    bannerHtml += '<div class="alert alert-info" style="margin-bottom:12px"><div class="alert-icon">!</div><div><div class="alert-title">Hospitalisation</div><div class="alert-body">Le système est suspendu.</div></div></div>';
     badgesHtml += '<span class="pill pill-info"><span class="pill-dot"></span>Hospitalisation</span>';
   }
 
-  // Remplissage
   if (config.remplissage) {
     badgesHtml += '<span class="pill pill-purple"><span class="pill-dot"></span>Remplissage</span>';
   }
@@ -961,9 +862,6 @@ function renderMedecinStatus(config) {
   badges.innerHTML = badgesHtml;
 }
 
-// ══════════════════════════════════════════════════
-// INIT + AUTO-REFRESH
-// ══════════════════════════════════════════════════
 loadAll();
 setInterval(loadAll, REFRESH_MS);
 </script>
