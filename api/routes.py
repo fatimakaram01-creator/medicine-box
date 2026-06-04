@@ -312,9 +312,9 @@ def toggle_system(body: ConfigToggle, request: Request):
         config_state["system_on"] = True
         sauvegarder_system_on(True)
 
-        # Générer les prises du jour immédiatement
+        # Générer les prises du jour selon le profil horaire actif
         aujourd_hui = datetime.now().date()
-        moments_config = {'matin': '08:30:00', 'midi': '13:30:00', 'soir': '20:30:00'}
+        moments_config = _get_moments_config()
         conn2 = get_connection()
         try:
             cursor2 = conn2.cursor()
@@ -436,5 +436,202 @@ def creer_alerte_systeme(type_alerte, message):
         cursor.close()
     except Exception as e:
         print(f"❌ Erreur création alerte système : {e}")
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════
+# HELPER : lire les plages horaires du profil actif
+# ═══════════════════════════════════════════════════════
+
+def _get_moments_config():
+    """
+    Retourne les heures de référence (milieu de plage) du profil actif.
+    Fallback sur les valeurs par défaut si aucun profil trouvé.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT matin_debut, matin_fin, midi_debut, midi_fin, soir_debut, soir_fin
+            FROM intervalles_profils WHERE actif = TRUE;
+        """)
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return {'matin': '08:30:00', 'midi': '13:30:00', 'soir': '20:30:00'}
+        # Calcule le milieu de chaque plage
+        def milieu(debut, fin):
+            d = datetime.combine(datetime.today(), debut)
+            f = datetime.combine(datetime.today(), fin)
+            if f < d:  # plage qui passe minuit
+                f += timedelta(days=1)
+            mid = d + (f - d) / 2
+            return mid.strftime("%H:%M:%S")
+        return {
+            'matin': milieu(row[0], row[1]),
+            'midi':  milieu(row[2], row[3]),
+            'soir':  milieu(row[4], row[5]),
+        }
+    except Exception as e:
+        print(f"❌ Erreur lecture profil actif : {e}")
+        return {'matin': '08:30:00', 'midi': '13:30:00', 'soir': '20:30:00'}
+    finally:
+        conn.close()
+
+
+# ═══════════════════════════════════════════════════════
+# INTERVALLES PROFILS
+# ═══════════════════════════════════════════════════════
+
+@router.get("/intervalles/profils/actif")
+def get_profil_actif():
+    """Retourne le profil actif uniquement"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, label,
+                   matin_debut::text, matin_fin::text,
+                   midi_debut::text,  midi_fin::text,
+                   soir_debut::text,  soir_fin::text
+            FROM intervalles_profils WHERE actif = TRUE;
+        """)
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return {"error": "Aucun profil actif"}
+        return {"id": row[0], "label": row[1],
+                "matin_debut": row[2], "matin_fin": row[3],
+                "midi_debut":  row[4], "midi_fin":  row[5],
+                "soir_debut":  row[6], "soir_fin":  row[7]}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/intervalles/profils")
+def get_intervalles_profils():
+    """Retourne tous les profils d'intervalles (historique complet)"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, label,
+                   matin_debut::text, matin_fin::text,
+                   midi_debut::text,  midi_fin::text,
+                   soir_debut::text,  soir_fin::text,
+                   date_debut::text,  date_fin::text,
+                   actif, nb_prises
+            FROM intervalles_profils
+            ORDER BY actif DESC, date_debut DESC;
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        return [{"id": r[0], "label": r[1],
+                 "matin_debut": r[2], "matin_fin": r[3],
+                 "midi_debut":  r[4], "midi_fin":  r[5],
+                 "soir_debut":  r[6], "soir_fin":  r[7],
+                 "date_debut":  r[8], "date_fin":  r[9],
+                 "actif": r[10], "nb_prises": r[11]} for r in rows]
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+class NouveauProfil(BaseModel):
+    label: str
+    matin_debut: str
+    matin_fin: str
+    midi_debut: str
+    midi_fin: str
+    soir_debut: str
+    soir_fin: str
+
+
+@router.post("/intervalles/profils")
+def creer_profil(data: NouveauProfil):
+    """Crée un nouveau profil et le définit comme actif"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        # Désactiver l'ancien profil actif
+        cursor.execute("""
+            UPDATE intervalles_profils
+            SET actif = FALSE, date_fin = CURRENT_DATE
+            WHERE actif = TRUE;
+        """)
+        # Créer le nouveau profil
+        cursor.execute("""
+            INSERT INTO intervalles_profils
+                (label, matin_debut, matin_fin, midi_debut, midi_fin,
+                 soir_debut, soir_fin, actif, date_debut)
+            VALUES (%s,%s,%s,%s,%s,%s,%s, TRUE, CURRENT_DATE)
+            RETURNING id;
+        """, (data.label, data.matin_debut, data.matin_fin,
+              data.midi_debut, data.midi_fin,
+              data.soir_debut, data.soir_fin))
+        new_id = cursor.fetchone()[0]
+        # Mettre à jour config
+        cursor.execute("""
+            UPDATE config SET valeur = %s
+            WHERE cle = 'intervalles_profil_actif_id';
+        """, (str(new_id),))
+        cursor.execute("""
+            UPDATE config SET valeur = CURRENT_DATE::TEXT
+            WHERE cle = 'intervalles_modifies_le';
+        """)
+        conn.commit()
+        cursor.close()
+        creer_alerte_systeme("contexte", f"Nouveau profil horaire créé : {data.label}")
+        return {"success": True, "id": new_id}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.post("/intervalles/profils/{profil_id}/activer")
+def activer_profil(profil_id: int):
+    """Réactive un ancien profil (médecin)"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        # Vérifier que le profil existe
+        cursor.execute("SELECT label FROM intervalles_profils WHERE id = %s;", (profil_id,))
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            return {"error": "Profil introuvable"}
+        label = row[0]
+        # Désactiver l'actuel
+        cursor.execute("""
+            UPDATE intervalles_profils
+            SET actif = FALSE, date_fin = CURRENT_DATE
+            WHERE actif = TRUE;
+        """)
+        # Réactiver l'ancien — nouvelle période
+        cursor.execute("""
+            UPDATE intervalles_profils
+            SET actif = TRUE, date_fin = NULL, date_debut = CURRENT_DATE
+            WHERE id = %s;
+        """, (profil_id,))
+        # Mettre à jour config
+        cursor.execute("""
+            UPDATE config SET valeur = %s
+            WHERE cle = 'intervalles_profil_actif_id';
+        """, (str(profil_id),))
+        cursor.execute("""
+            UPDATE config SET valeur = CURRENT_DATE::TEXT
+            WHERE cle = 'intervalles_modifies_le';
+        """)
+        conn.commit()
+        cursor.close()
+        creer_alerte_systeme("contexte", f"Profil horaire réactivé : {label}")
+        return {"success": True, "label": label}
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         conn.close()
