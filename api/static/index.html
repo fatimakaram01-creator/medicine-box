@@ -358,6 +358,20 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
     </div>
   </div>
+  <div class="ctrl-card">
+    <div class="section-label">Contextes spéciaux</div>
+    <div id="contextes-speciaux-list"><div class="loading">Chargement...</div></div>
+    <div class="ctrl-row" style="flex-wrap:wrap;margin-top:4px">
+      <div class="ctrl-left">
+        <div class="ctrl-label">🏥 Hospitalisation</div>
+        <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
+      </div>
+      <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
+      <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
+        <input type="date" id="hospi-date" placeholder="Date de retour">
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ════════════ PAGE MÉDECIN ════════════ -->
@@ -381,19 +395,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="card">
     <div class="section-label">Dernières alertes</div>
     <div id="medecin-alertes"><div class="loading">Chargement...</div></div>
-  </div>
-  <div class="ctrl-card">
-    <div class="section-label">Contextes spéciaux</div>
-    <div class="ctrl-row" style="flex-wrap:wrap">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🏥 Hospitalisation</div>
-        <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
-      </div>
-      <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
-      <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
-        <input type="date" id="hospi-date" placeholder="Date de retour">
-      </div>
-    </div>
   </div>
   <div class="ctrl-card">
     <div class="section-label">Changement de prescription</div>
@@ -426,8 +427,12 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     </div>
   </div>
   <div class="card">
-    <div class="section-label">Historique des profils horaires</div>
-    <div id="profils-historique"><div class="loading">Chargement...</div></div>
+    <div class="section-label">Profil horaire actif</div>
+    <div id="profil-actif-medecin"><div class="loading">Chargement...</div></div>
+    <div style="margin-top:12px">
+      <div class="section-label">Historique des profils</div>
+      <div id="profils-historique"><div class="loading">Chargement...</div></div>
+    </div>
   </div>
 </div>
 
@@ -541,7 +546,11 @@ async function loadAll() {
   if (hist) renderHistPrises(hist);
 
   const profils = await api('/intervalles/profils');
-  if (profils) renderProfilsHistorique(profils);
+  if (profils) {
+    renderContextesSpeciaux(profils);   // → page patient
+    renderProfilsHistorique(profils);   // → page médecin
+    renderProfilActifMedecin(profils);  // → page médecin lecture seule
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -982,6 +991,72 @@ function pinKey(k) {
 // ══════════════════════════════════════════════════
 // PROFILS HORAIRES
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// CONTEXTES SPÉCIAUX — page patient
+// ══════════════════════════════════════════════════
+function renderContextesSpeciaux(profils) {
+  const div = document.getElementById('contextes-speciaux-list');
+  if (!Array.isArray(profils) || !profils.length) {
+    div.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary);padding:4px 0">Aucun profil créé par le médecin</div>';
+    return;
+  }
+  div.innerHTML = profils.map(p => `
+    <div class="ctrl-row" style="border-bottom:0.5px solid var(--border);padding:10px 0">
+      <div class="ctrl-left">
+        <div class="ctrl-label">${p.label}</div>
+        <div class="ctrl-sub" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px">
+          <span class="profil-plage">🌅 ${p.matin_debut?.slice(0,5)}–${p.matin_fin?.slice(0,5)}</span>
+          <span class="profil-plage">☀️ ${p.midi_debut?.slice(0,5)}–${p.midi_fin?.slice(0,5)}</span>
+          <span class="profil-plage">🌙 ${p.soir_debut?.slice(0,5)}–${p.soir_fin?.slice(0,5)}</span>
+        </div>
+      </div>
+      ${p.actif
+        ? '<span class="pill pill-ok"><span class="pill-dot"></span>Actif</span>'
+        : `<button class="btn btn-primary" style="font-size:11px;padding:5px 12px;flex-shrink:0" onclick="activerProfilPatient(${p.id})">Activer</button>`
+      }
+    </div>
+  `).join('');
+}
+
+async function activerProfilPatient(id) {
+  const res = await api(`/intervalles/profils/${id}/activer`, { method: 'POST' });
+  if (res?.success) {
+    showToast(`✅ Profil "${res.label}" activé`);
+    const profils = await api('/intervalles/profils');
+    if (profils) {
+      renderContextesSpeciaux(profils);
+      renderProfilsHistorique(profils);
+      renderProfilActifMedecin(profils);
+    }
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
+// ══════════════════════════════════════════════════
+// PROFILS HORAIRES — page médecin (lecture seule)
+// ══════════════════════════════════════════════════
+function renderProfilActifMedecin(profils) {
+  const div = document.getElementById('profil-actif-medecin');
+  if (!div) return;
+  const actif = Array.isArray(profils) ? profils.find(p => p.actif) : null;
+  if (!actif) {
+    div.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Aucun profil actif</div>';
+    return;
+  }
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:14px;font-weight:500">${actif.label}</div>
+      <span class="pill pill-ok"><span class="pill-dot"></span>Actif depuis le ${actif.date_debut}</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="profil-plage">🌅 Matin ${actif.matin_debut?.slice(0,5)}–${actif.matin_fin?.slice(0,5)}</span>
+      <span class="profil-plage">☀️ Midi ${actif.midi_debut?.slice(0,5)}–${actif.midi_fin?.slice(0,5)}</span>
+      <span class="profil-plage">🌙 Soir ${actif.soir_debut?.slice(0,5)}–${actif.soir_fin?.slice(0,5)}</span>
+    </div>
+  `;
+}
+
 function renderProfilsHistorique(profils) {
   const div = document.getElementById('profils-historique');
   if (!Array.isArray(profils) || !profils.length) {
@@ -1028,7 +1103,11 @@ async function creerProfil() {
     showToast(`✅ Profil "${label}" créé et activé`);
     document.getElementById('profil-label').value = '';
     const profils = await api('/intervalles/profils');
-    if (profils) renderProfilsHistorique(profils);
+    if (profils) {
+      renderContextesSpeciaux(profils);
+      renderProfilsHistorique(profils);
+      renderProfilActifMedecin(profils);
+    }
   } else {
     showToast('Erreur : ' + (res?.error || 'inconnue'));
   }
@@ -1039,7 +1118,11 @@ async function activerProfil(id) {
   if (res?.success) {
     showToast(`✅ Profil "${res.label}" réactivé`);
     const profils = await api('/intervalles/profils');
-    if (profils) renderProfilsHistorique(profils);
+    if (profils) {
+      renderContextesSpeciaux(profils);
+      renderProfilsHistorique(profils);
+      renderProfilActifMedecin(profils);
+    }
   } else {
     showToast('Erreur : ' + (res?.error || 'inconnue'));
   }
