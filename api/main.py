@@ -1,7 +1,7 @@
 # api/main.py
 # ─────────────────────────────────────────────────────────────
 # FastAPI app — importe les routes, lance le subscriber MQTT,
-# et lance la tâche planifiée d'envoi des alertes buzzer
+# et lance les tâches planifiées
 # ─────────────────────────────────────────────────────────────
 #
 # ARCHITECTURE DU FLUX D'ALERTE :
@@ -24,6 +24,59 @@ from fastapi import FastAPI
 from mqtt.subscriber import start_mqtt
 from db.database import get_connection
 from api.routes import config_state, creer_alerte_systeme
+
+
+# ─────────────────────────────────────────────────────────────
+# NETTOYAGE AU DÉMARRAGE : PRISES OBSOLÈTES
+# ─────────────────────────────────────────────────────────────
+#
+# Problème résolu :
+#   Si la boîte s'éteint (coupure courant, batterie vide) pendant
+#   plusieurs jours, les prises en_attente des jours passés restent
+#   dans la base sans jamais être résolues.
+#
+#   Sans ce nettoyage :
+#     → La tâche doses_manquees les marquerait "manquée" au redémarrage
+#     → Le ML apprendrait que le patient est non-observant → BIAIS TOTAL
+#
+#   Avec ce nettoyage :
+#     → Au redémarrage, toutes les prises en_attente dont l'heure
+#       est déjà passée sont supprimées silencieusement
+#     → Aucune fausse "manquée" dans la base → ML propre ✅
+#
+# Cette fonction est appelée UNE SEULE FOIS au démarrage du backend,
+# avant le lancement des tâches planifiées.
+# ─────────────────────────────────────────────────────────────
+
+async def nettoyer_prises_obsoletes():
+    """
+    Supprime toutes les prises en_attente dont l'heure prévue
+    est déjà passée. Appelée au démarrage du backend.
+
+    Logique :
+    - DELETE prises WHERE statut = 'en_attente' AND heure_prevue < NOW()
+    - Couvre : extinction de la boîte, redémarrage Render, coupure réseau
+    - Garantit l'intégrité des données ML
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            DELETE FROM prises
+            WHERE statut = 'en_attente'
+              AND heure_prevue < NOW();
+        """)
+        deleted = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        if deleted > 0:
+            print(f"🧹 {deleted} prise(s) obsolète(s) supprimée(s) au démarrage")
+        else:
+            print("🧹 Aucune prise obsolète — base propre")
+    except Exception as e:
+        print(f"❌ Erreur nettoyage prises : {e}")
+    finally:
+        conn.close()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -122,10 +175,6 @@ async def tache_alertes(mqtt_client):
                 # Filtre jour_semaine : le seed génère une alerte par jour×moment,
                 # donc on filtre sur le jour actuel pour ne pas envoyer les alertes
                 # d'un autre jour
-                #
-                # On prend les alertes les plus récentes (ORDER BY id DESC)
-                # car le ML peut recalculer les heures d'alerte et insérer
-                # de nouvelles lignes — on veut toujours la dernière version
                 cursor.execute("""
                     SELECT DISTINCT moment, heure_alerte
                     FROM alertes_optimisation
@@ -142,7 +191,6 @@ async def tache_alertes(mqtt_client):
 
                     # ── Clé unique pour cette alerte ──
                     # Empêche d'envoyer la même alerte plusieurs fois
-                    # (la boucle tourne toutes les 60s mais la minute dure 60s)
                     cle = f"{date_courante}_{moment}"
                     if cle in alertes_envoyees:
                         continue  # déjà envoyée aujourd'hui
@@ -183,7 +231,6 @@ async def tache_alertes(mqtt_client):
                 conn.close()
 
         except Exception as e:
-            # Erreur générale → log et continue (ne pas crasher la tâche)
             print(f"❌ Erreur tâche alertes : {e}")
 
         # ── Attendre 60 secondes avant la prochaine vérification ──
@@ -204,6 +251,10 @@ async def tache_alertes(mqtt_client):
 #
 # Si manquée → UPDATE prises SET statut='manque'
 #            → INSERT alertes (dose_manquee) pour le dashboard
+#
+# IMPORTANT : cette tâche ne tourne QUE si l'ESP32 est connecté.
+# Si la boîte est éteinte → les prises restent en_attente (gelées).
+# C'est le nettoyage au démarrage qui les supprime à la reconnexion.
 # ─────────────────────────────────────────────────────────────
 
 async def tache_doses_manquees(mqtt_client):
@@ -217,7 +268,6 @@ async def tache_doses_manquees(mqtt_client):
     print("⏰ Tâche doses manquées démarrée — vérification toutes les 5 min")
 
     # Fin des intervalles médecin (en heures)
-    # Aligné avec INTERVALLE_MEDECIN dans seed.py
     fin_intervalle = {
         'matin': 11,   # 06:00 → 11:00
         'midi':  16,   # 11:00 → 16:00
@@ -248,7 +298,6 @@ async def tache_doses_manquees(mqtt_client):
             try:
                 cursor = conn.cursor()
 
-                # Récupérer le patient_id
                 cursor.execute("SELECT id FROM patients LIMIT 1;")
                 row = cursor.fetchone()
                 if not row:
@@ -282,8 +331,7 @@ async def tache_doses_manquees(mqtt_client):
 
                         # ── Marquer la prise comme manquée ──
                         cursor.execute("""
-                            UPDATE prises
-                            SET statut = 'manque'
+                            UPDATE prises SET statut = 'manque'
                             WHERE id = %s;
                         """, (prise_id,))
 
@@ -336,7 +384,6 @@ async def tache_doses_manquees(mqtt_client):
 #   matin → 08:30 (milieu de 06:00→11:00)
 #   midi  → 13:30 (milieu de 11:00→16:00)
 #   soir  → 20:30 (milieu de 19:00→22:00)
-# Aligné avec le seed.py qui utilise la même logique.
 # ─────────────────────────────────────────────────────────────
 
 async def tache_generation_prises():
@@ -349,11 +396,6 @@ async def tache_generation_prises():
     await asyncio.sleep(3)
     print("⏰ Tâche génération prises démarrée — vérification toutes les 30 min")
 
-    # Heures prévues = milieu des intervalles médecin
-    # Aligné avec seed.py : milieu = (debut + fin) // 2
-    #   matin : (360 + 660) // 2 = 510 min = 08:30
-    #   midi  : (660 + 960) // 2 = 810 min = 13:30
-    #   soir  : (1140 + 1320) // 2 = 1230 min = 20:30
     moments_config = {
         'matin': '08:30:00',
         'midi':  '13:30:00',
@@ -389,7 +431,6 @@ async def tache_generation_prises():
                 patient_id = row[0]
 
                 # Récupérer la prescription active (la plus récente)
-                # On vérifie que la date du jour est dans la période de prescription
                 cursor.execute("""
                     SELECT id FROM prescriptions
                     WHERE patient_id = %s
@@ -401,8 +442,6 @@ async def tache_generation_prises():
 
                 row_presc = cursor.fetchone()
                 if not row_presc:
-                    # Pas de prescription active aujourd'hui
-                    # → pas de prises à générer
                     cursor.close()
                     conn.close()
                     await asyncio.sleep(1800)
@@ -414,7 +453,6 @@ async def tache_generation_prises():
 
                 for moment, heure_str in moments_config.items():
                     # Vérifier si la prise existe déjà pour ce moment aujourd'hui
-                    # (peu importe le statut : en_attente, pris, ou manque)
                     cursor.execute("""
                         SELECT id FROM prises
                         WHERE patient_id = %s
@@ -423,11 +461,9 @@ async def tache_generation_prises():
                     """, (patient_id, moment, aujourd_hui))
 
                     if cursor.fetchone():
-                        # La prise existe déjà → ne rien faire (idempotent)
-                        continue
+                        continue  # déjà existante → pas de doublon
 
                     # ── Créer la prise en_attente ──
-                    # heure_prevue = date du jour + heure du milieu d'intervalle
                     heure_prevue = datetime.combine(
                         aujourd_hui,
                         datetime.strptime(heure_str, "%H:%M:%S").time()
@@ -446,9 +482,6 @@ async def tache_generation_prises():
                 if prises_creees > 0:
                     conn.commit()
                     print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui}")
-                else:
-                    # Toutes les prises existent déjà → rien à faire
-                    pass
 
                 cursor.close()
             except Exception as e:
@@ -468,10 +501,10 @@ async def tache_generation_prises():
 # ─────────────────────────────────────────────────────────────
 #
 # L'ESP32 envoie un heartbeat sur medicinebox/statut toutes les
-# 5 minutes ({"status":"heartbeat"}). Cette tâche vérifie toutes
-# les 10 minutes si un heartbeat a été reçu récemment.
+# 30 secondes ({"status":"heartbeat"}). Cette tâche vérifie toutes
+# les 10 secondes si un heartbeat a été reçu récemment.
 #
-# LOGIQUE DE DÉCONNEXION (après 24h sans heartbeat) :
+# LOGIQUE DE DÉCONNEXION (après 40s sans heartbeat) :
 #   - esp32_connected = false
 #   - Les tâches se gèlent : les prises restent en_attente
 #     (PAS marquées manquées → pas de biais ML)
@@ -480,15 +513,7 @@ async def tache_generation_prises():
 #
 # LOGIQUE DE RECONNEXION (géré par subscriber.py) :
 #   - L'ESP32 envoie "online" → esp32_connected = true
-#   - L'ESP32 vide son EEPROM/SPIFFS → publie les prises stockées
-#   - Cas 1 : données EEPROM reçues → UPDATE prises (rattrapage)
-#   - Cas 2 : aucune donnée → DELETE prises en_attente de la
-#     période de déconnexion (effacement, comme si rien ne s'est passé)
-#
-# POURQUOI 24h ET PAS 15min ?
-#   Le patient peut aller au travail sans WiFi le matin et revenir
-#   le soir. 24h laisse le temps à la boîte de se reconnecter
-#   sans fausse alerte. Les prises restent en_attente entre-temps.
+#   - L'ESP32 vide son SPIFFS → publie les prises stockées offline
 # ─────────────────────────────────────────────────────────────
 
 # Variable globale : timestamp du dernier heartbeat reçu
@@ -504,8 +529,8 @@ def mettre_a_jour_heartbeat():
 
 async def tache_heartbeat():
     """
-    Vérifie toutes les 10 minutes si l'ESP32 a envoyé un heartbeat.
-    Si pas de heartbeat depuis 24h → déconnexion détectée.
+    Vérifie toutes les 10 secondes si l'ESP32 a envoyé un heartbeat.
+    Si pas de heartbeat depuis 40s → déconnexion détectée.
     """
     await asyncio.sleep(15)
     print("⏰ Tâche heartbeat démarrée — vérification toutes les 10 min")
@@ -519,12 +544,10 @@ async def tache_heartbeat():
             delta = maintenant - dernier_heartbeat
 
             if delta > timedelta(seconds=40):
-                # ── ESP32 DÉCONNECTÉ DEPUIS 24H ──
+                # ── ESP32 DÉCONNECTÉ ──
                 if not deja_deconnecte:
                     config_state["esp32_connected"] = False
                     deja_deconnecte = True
-
-                    # Notifier le médecin (une seule fois)
                     creer_alerte_systeme(
                         "systeme",
                         "Boîte déconnectée depuis plus de 24h"
@@ -533,15 +556,13 @@ async def tache_heartbeat():
 
             elif delta < timedelta(hours=24) and deja_deconnecte:
                 # ── ESP32 RECONNECTÉ ──
-                # Le flag est remis à False, la logique de rattrapage/effacement
-                # est gérée par subscriber.py quand il reçoit le statut "online"
                 deja_deconnecte = False
                 print("🟢 ESP32 reconnecté — en attente du vidage EEPROM")
 
         except Exception as e:
             print(f"❌ Erreur tâche heartbeat : {e}")
 
-        # Vérifier toutes les 10 minutes
+        # Vérifier toutes les 10 secondes
         await asyncio.sleep(10)
 
 
@@ -550,10 +571,12 @@ async def tache_heartbeat():
 # ─────────────────────────────────────────────────────────────
 #
 # Au démarrage :
-#   1. Lance le subscriber MQTT (écoute ESP32)
-#   2. Lance la tâche d'envoi des alertes buzzer (toutes les 60s)
-#   3. Lance la tâche de détection des doses manquées (toutes les 5 min)
-#   4. Lance la tâche de génération des prises du jour (toutes les 30 min)
+#   1. Nettoie les prises obsolètes (boîte éteinte longtemps)
+#   2. Lance le subscriber MQTT (écoute ESP32)
+#   3. Lance la tâche d'envoi des alertes buzzer (toutes les 60s)
+#   4. Lance la tâche de détection des doses manquées (toutes les 5 min)
+#   5. Lance la tâche de génération des prises du jour (toutes les 30 min)
+#   6. Lance la tâche heartbeat (toutes les 10s)
 #
 # À l'arrêt :
 #   1. Annule les tâches en arrière-plan
@@ -562,6 +585,11 @@ async def tache_heartbeat():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ── Nettoyage des prises obsolètes au démarrage ──
+    # Supprime les prises en_attente dont l'heure est déjà passée
+    # Évite les faux manquées après extinction de la boîte
+    await nettoyer_prises_obsoletes()
+
     # ── Démarrage : lance le subscriber MQTT ──
     mqtt_client = start_mqtt()
     app.state.mqtt_client = mqtt_client
@@ -594,6 +622,10 @@ async def lifespan(app: FastAPI):
         mqtt_client.disconnect()
         print("🔴 MQTT déconnecté")
 
+
+# ─────────────────────────────────────────────────────────────
+# APPLICATION FASTAPI
+# ─────────────────────────────────────────────────────────────
 
 app = FastAPI(title="Medicine Box API", lifespan=lifespan)
 
