@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from mqtt.subscriber import start_mqtt
 from db.database import get_connection
-from api.routes import config_state, creer_alerte_systeme
+from api.routes import config_state, creer_alerte_systeme, _get_moments_config
 
 
 # ─────────────────────────────────────────────────────────────
@@ -243,19 +243,50 @@ async def tache_alertes(mqtt_client):
 #
 # Vérifie toutes les 5 minutes si une dose est manquée.
 #
-# Une dose est manquée quand l'intervalle médecin est dépassé
-# et que la prise est toujours 'en_attente' :
-#   - Matin : après 11:00 (fin de l'intervalle 06:00→11:00)
-#   - Midi  : après 16:00 (fin de l'intervalle 11:00→16:00)
-#   - Soir  : après 22:00 (fin de l'intervalle 19:00→22:00)
+# Une dose est manquée quand la FIN de la plage horaire du profil
+# actif est dépassée et que la prise est toujours 'en_attente'.
 #
-# Si manquée → UPDATE prises SET statut='manque'
-#            → INSERT alertes (dose_manquee) pour le dashboard
+# IMPORTANT : cette tâche lit le profil actif depuis intervalles_profils.
+# Si la plage est désactivée (00:00→00:00) → elle est ignorée.
+# Si le profil change → les fins d'intervalles changent automatiquement.
 #
 # IMPORTANT : cette tâche ne tourne QUE si l'ESP32 est connecté.
 # Si la boîte est éteinte → les prises restent en_attente (gelées).
 # C'est le nettoyage au démarrage qui les supprime à la reconnexion.
 # ─────────────────────────────────────────────────────────────
+
+def _get_fin_intervalles():
+    """
+    Lit les fins de plages du profil actif depuis Supabase.
+    Retourne un dict {moment: heure_fin_en_heures}.
+    Ignore les plages désactivées (00:00).
+    Fallback sur les valeurs par défaut si aucun profil.
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT matin_fin, midi_fin, soir_fin
+            FROM intervalles_profils WHERE actif = TRUE;
+        """)
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            # Fallback : intervalles par défaut
+            return {'matin': 11, 'midi': 16, 'soir': 22}
+        result = {}
+        noms = ['matin', 'midi', 'soir']
+        for i, nom in enumerate(noms):
+            fin = row[i]
+            if fin and str(fin) != '00:00:00':
+                result[nom] = fin.hour  # ex: time(11,0,0) → 11
+        return result if result else {'matin': 11, 'midi': 16, 'soir': 22}
+    except Exception as e:
+        print(f"❌ Erreur lecture fin intervalles : {e}")
+        return {'matin': 11, 'midi': 16, 'soir': 22}
+    finally:
+        conn.close()
+
 
 async def tache_doses_manquees(mqtt_client):
     """
@@ -266,13 +297,6 @@ async def tache_doses_manquees(mqtt_client):
     # Attendre 10 secondes au démarrage
     await asyncio.sleep(10)
     print("⏰ Tâche doses manquées démarrée — vérification toutes les 5 min")
-
-    # Fin des intervalles médecin (en heures)
-    fin_intervalle = {
-        'matin': 11,   # 06:00 → 11:00
-        'midi':  16,   # 11:00 → 16:00
-        'soir':  22,   # 19:00 → 22:00
-    }
 
     while True:
         try:
@@ -294,6 +318,10 @@ async def tache_doses_manquees(mqtt_client):
             maintenant = datetime.now()
             heure_actuelle = maintenant.hour
 
+            # ── Lire les fins de plages du profil actif ──
+            # (lu à chaque cycle pour capter les changements de profil)
+            fin_intervalle = _get_fin_intervalles()
+
             conn = get_connection()
             try:
                 cursor = conn.cursor()
@@ -307,7 +335,7 @@ async def tache_doses_manquees(mqtt_client):
                     continue
                 patient_id = row[0]
 
-                # ── Vérifier chaque moment ──
+                # ── Vérifier chaque moment actif du profil ──
                 for moment, heure_fin in fin_intervalle.items():
 
                     # Si l'heure actuelle n'a pas encore dépassé la fin de l'intervalle
@@ -370,37 +398,35 @@ async def tache_doses_manquees(mqtt_client):
 #   en_attente pour les nouveaux jours → le système est aveugle.
 #
 # Solution :
-#   Cette tâche vérifie toutes les 30 minutes si les 3 prises
-#   du jour (matin/midi/soir) existent dans la table prises.
+#   Cette tâche vérifie toutes les 30 minutes si les prises
+#   du jour existent dans la table prises.
 #   Si elles n'existent pas → elle les crée avec statut='en_attente'.
+#
+# IMPORTANT : les heures prévues sont lues depuis le profil horaire
+# actif (table intervalles_profils) via _get_moments_config().
+# Si le médecin change le profil → les nouvelles prises utilisent
+# automatiquement les nouveaux milieux de plages.
+#
+# Si une plage est désactivée (00:00) → _get_moments_config()
+# l'ignore → pas de prise créée pour ce moment.
 #
 # Pourquoi toutes les 30 min et pas juste à minuit ?
 #   - Si le backend redémarre en milieu de journée, les prises
 #     du jour doivent quand même être créées
 #   - La vérification est idempotente (si les prises existent déjà,
 #     on ne fait rien → pas de doublons)
-#
-# Les heures prévues sont les milieux des intervalles médecin :
-#   matin → 08:30 (milieu de 06:00→11:00)
-#   midi  → 13:30 (milieu de 11:00→16:00)
-#   soir  → 20:30 (milieu de 19:00→22:00)
 # ─────────────────────────────────────────────────────────────
 
 async def tache_generation_prises():
     """
     Boucle infinie qui vérifie toutes les 30 minutes
-    si les prises du jour existent. Si non, les crée.
+    si les prises du jour existent. Si non, les crée
+    selon le profil horaire actif.
     """
 
     # Attendre 3 secondes au démarrage pour que la BDD soit prête
     await asyncio.sleep(3)
     print("⏰ Tâche génération prises démarrée — vérification toutes les 30 min")
-
-    moments_config = {
-        'matin': '08:30:00',
-        'midi':  '13:30:00',
-        'soir':  '20:30:00',
-    }
 
     while True:
         try:
@@ -415,6 +441,13 @@ async def tache_generation_prises():
 
             maintenant = datetime.now()
             aujourd_hui = maintenant.date()
+
+            # ── Lire le profil horaire actif depuis Supabase ──
+            # _get_moments_config() lit intervalles_profils WHERE actif=TRUE
+            # et calcule le milieu de chaque plage active.
+            # Les plages désactivées (00:00) sont ignorées.
+            # Fallback : 08:30 / 13:30 / 20:30 si aucun profil trouvé.
+            moments_config = _get_moments_config()
 
             conn = get_connection()
             try:
@@ -481,7 +514,7 @@ async def tache_generation_prises():
 
                 if prises_creees > 0:
                     conn.commit()
-                    print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui}")
+                    print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui} (profil actif)")
 
                 cursor.close()
             except Exception as e:
