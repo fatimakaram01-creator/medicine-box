@@ -203,6 +203,9 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .time-group{display:flex;flex-direction:column;gap:4px}
 .time-group label{font-size:11px;color:var(--text-secondary)}
 .time-group input{padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--bg);color:var(--text-primary);font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
+.plage-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;align-items:end}
+.plage-row-label{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);margin-bottom:4px}
+@media(max-width:480px){.time-grid{grid-template-columns:1fr}.plage-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -419,36 +422,36 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="section-label">Profil horaire</div>
     <div class="input-wrap">
       <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
-      <div class="time-grid">
-        <div class="time-group">
-          <label style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" id="check-matin" checked onchange="togglePlage('matin')"> 🌅 Matin — début
-          </label>
-          <input type="time" id="matin-debut" value="06:00">
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px">
+        <!-- Matin -->
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500">
+            <input type="checkbox" id="check-matin" checked onchange="togglePlage('matin')"> 🌅 Matin
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="time-group"><label>Début</label><input type="time" id="matin-debut" value="06:00"></div>
+            <div class="time-group"><label>Fin</label><input type="time" id="matin-fin" value="11:00"></div>
+          </div>
         </div>
-        <div class="time-group">
-          <label>🌅 Matin — fin</label>
-          <input type="time" id="matin-fin" value="11:00">
+        <!-- Midi -->
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500">
+            <input type="checkbox" id="check-midi" checked onchange="togglePlage('midi')"> ☀️ Midi
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="time-group"><label>Début</label><input type="time" id="midi-debut" value="11:00"></div>
+            <div class="time-group"><label>Fin</label><input type="time" id="midi-fin" value="16:00"></div>
+          </div>
         </div>
-        <div class="time-group">
-          <label style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" id="check-midi" checked onchange="togglePlage('midi')"> ☀️ Midi — début
-          </label>
-          <input type="time" id="midi-debut" value="11:00">
-        </div>
-        <div class="time-group">
-          <label>☀️ Midi — fin</label>
-          <input type="time" id="midi-fin" value="16:00">
-        </div>
-        <div class="time-group">
-          <label style="display:flex;align-items:center;gap:6px">
-            <input type="checkbox" id="check-soir" checked onchange="togglePlage('soir')"> 🌙 Soir — début
-          </label>
-          <input type="time" id="soir-debut" value="16:00">
-        </div>
-        <div class="time-group">
-          <label>🌙 Soir — fin</label>
-          <input type="time" id="soir-fin" value="22:00">
+        <!-- Soir -->
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:10px">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500">
+            <input type="checkbox" id="check-soir" checked onchange="togglePlage('soir')"> 🌙 Soir
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div class="time-group"><label>Début</label><input type="time" id="soir-debut" value="16:00"></div>
+            <div class="time-group"><label>Fin</label><input type="time" id="soir-fin" value="22:00"></div>
+          </div>
         </div>
       </div>
       <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
