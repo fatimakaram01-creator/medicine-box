@@ -462,17 +462,22 @@ def _get_moments_config():
             return {'matin': '08:30:00', 'midi': '13:30:00', 'soir': '20:30:00'}
         # Calcule le milieu de chaque plage
         def milieu(debut, fin):
+            if not debut or str(debut) == '00:00:00':
+                return None  # plage désactivée
             d = datetime.combine(datetime.today(), debut)
             f = datetime.combine(datetime.today(), fin)
-            if f < d:  # plage qui passe minuit
+            if f < d:
                 f += timedelta(days=1)
             mid = d + (f - d) / 2
             return mid.strftime("%H:%M:%S")
-        return {
-            'matin': milieu(row[0], row[1]),
-            'midi':  milieu(row[2], row[3]),
-            'soir':  milieu(row[4], row[5]),
-        }
+        result = {}
+        m = milieu(row[0], row[1])
+        if m: result['matin'] = m
+        m = milieu(row[2], row[3])
+        if m: result['midi'] = m
+        m = milieu(row[4], row[5])
+        if m: result['soir'] = m
+        return result if result else {'matin': '08:30:00', 'midi': '13:30:00', 'soir': '20:30:00'}
     except Exception as e:
         print(f"❌ Erreur lecture profil actif : {e}")
         return {'matin': '08:30:00', 'midi': '13:30:00', 'soir': '20:30:00'}
