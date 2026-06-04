@@ -393,65 +393,60 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <button class="toggle on" id="toggle-buzzer" onclick="toggleConfig('buzzer')"></button>
     </div>
   </div>
-  <div class="ctrl-card">
-    <div class="section-label">Contextes spéciaux</div>
-    <div class="ctrl-row" style="flex-wrap:wrap">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🌙 Mode Ramadan</div>
-        <div class="ctrl-sub">Décale les horaires : shour avant le fajr, midi suspendu, iftar après le coucher du soleil.</div>
+  <!-- ── Section médecin (PIN requis) ── -->
+  <div id="ctrl-medecin-locked" style="margin-bottom:12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);cursor:pointer" onclick="demanderPinControles()">
+      <div>
+        <div style="font-size:13px;font-weight:500">🔒 Section médecin</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:1px">Hospitalisation · Prescription · Profil horaire</div>
       </div>
-      <button class="toggle" id="toggle-ramadan" onclick="toggleRamadan()"></button>
-      <div class="select-wrap" id="ramadan-ville-wrap" style="width:100%;display:none">
-        <select id="ramadan-ville">
-          <option value="">Choisir la ville</option>
-          <option value="Agadir">Agadir</option>
-          <option value="Casablanca">Casablanca</option>
-          <option value="Marrakech">Marrakech</option>
-          <option value="Rabat">Rabat</option>
-          <option value="Fes">Fès</option>
-          <option value="Tanger">Tanger</option>
+      <span class="pill pill-info">Déverrouiller</span>
+    </div>
+  </div>
+
+  <div id="ctrl-medecin-content" style="display:none">
+    <div class="ctrl-card">
+      <div class="section-label">Contextes spéciaux</div>
+      <div class="ctrl-row" style="flex-wrap:wrap">
+        <div class="ctrl-left">
+          <div class="ctrl-label">🏥 Hospitalisation</div>
+          <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
+        </div>
+        <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
+        <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
+          <input type="date" id="hospi-date" placeholder="Date de retour">
+        </div>
+      </div>
+    </div>
+    <div class="ctrl-card">
+      <div class="section-label">Changement de prescription</div>
+      <div class="input-wrap">
+        <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
+        <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
+        <select id="rx-frequence">
+          <option value="1">1 prise / jour</option>
+          <option value="2">2 prises / jour</option>
+          <option value="3" selected>3 prises / jour</option>
         </select>
+        <input type="text" id="rx-medecin" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
+        <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
+        <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
       </div>
     </div>
-    <div class="ctrl-row" style="flex-wrap:wrap">
-      <div class="ctrl-left">
-        <div class="ctrl-label">🏥 Hospitalisation</div>
-        <div class="ctrl-sub">Suspend complètement le système. Les médicaments sont gérés par l'hôpital.</div>
+    <div class="ctrl-card">
+      <div class="section-label">Profil horaire</div>
+      <div class="input-wrap">
+        <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
+        <div class="time-grid">
+          <div class="time-group"><label>🌅 Matin — début</label><input type="time" id="matin-debut" value="06:00"></div>
+          <div class="time-group"><label>🌅 Matin — fin</label><input type="time" id="matin-fin" value="11:00"></div>
+          <div class="time-group"><label>☀️ Midi — début</label><input type="time" id="midi-debut" value="11:00"></div>
+          <div class="time-group"><label>☀️ Midi — fin</label><input type="time" id="midi-fin" value="16:00"></div>
+          <div class="time-group"><label>🌙 Soir — début</label><input type="time" id="soir-debut" value="16:00"></div>
+          <div class="time-group"><label>🌙 Soir — fin</label><input type="time" id="soir-fin" value="22:00"></div>
+        </div>
+        <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
       </div>
-      <button class="toggle" id="toggle-hospitalisation" onclick="toggleHospitalisation()"></button>
-      <div class="input-wrap" id="hospi-date-wrap" style="width:100%;display:none">
-        <input type="date" id="hospi-date" placeholder="Date de retour">
-      </div>
-    </div>
-  </div>
-  <div class="ctrl-card">
-    <div class="section-label">Changement de prescription (médecin)</div>
-    <div class="input-wrap">
-      <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
-      <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
-      <select id="rx-frequence">
-        <option value="1">1 prise / jour</option>
-        <option value="2">2 prises / jour</option>
-        <option value="3" selected>3 prises / jour</option>
-      </select>
-      <input type="text" id="rx-medecin" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
-      <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
-      <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
-    </div>
-  </div>
-  <div class="ctrl-card" id="ctrl-profil-horaire">
-    <div class="section-label">Profil horaire (médecin)</div>
-    <div class="input-wrap">
-      <input type="text" id="profil-label" placeholder="Label (ex: Night Shift, Ramadan, Voyage Paris)">
-      <div class="time-grid">
-        <div class="time-group"><label>🌅 Matin — début</label><input type="time" id="matin-debut" value="06:00"></div>
-        <div class="time-group"><label>🌅 Matin — fin</label><input type="time" id="matin-fin" value="11:00"></div>
-        <div class="time-group"><label>☀️ Midi — début</label><input type="time" id="midi-debut" value="11:00"></div>
-        <div class="time-group"><label>☀️ Midi — fin</label><input type="time" id="midi-fin" value="16:00"></div>
-        <div class="time-group"><label>🌙 Soir — début</label><input type="time" id="soir-debut" value="16:00"></div>
-        <div class="time-group"><label>🌙 Soir — fin</label><input type="time" id="soir-fin" value="22:00"></div>
-      </div>
-      <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
     </div>
   </div>
   <div id="ctrl-status"></div>
@@ -730,11 +725,12 @@ function renderConfig(config) {
   document.getElementById('toggle-system').classList.toggle('on', config.system_on);
   document.getElementById('toggle-remplissage').classList.toggle('on', config.remplissage);
   document.getElementById('toggle-buzzer').classList.toggle('on', config.buzzer);
-  document.getElementById('toggle-ramadan').classList.toggle('on', config.ramadan);
-  document.getElementById('toggle-hospitalisation').classList.toggle('on', config.hospitalisation);
-  if (config.ramadan) document.getElementById('ramadan-ville-wrap').style.display = 'block';
-  if (config.hospitalisation) document.getElementById('hospi-date-wrap').style.display = 'block';
-  if (config.ramadan_ville) document.getElementById('ramadan-ville').value = config.ramadan_ville;
+  const hospiToggle = document.getElementById('toggle-hospitalisation');
+  if (hospiToggle) hospiToggle.classList.toggle('on', config.hospitalisation);
+  if (config.hospitalisation) {
+    const w = document.getElementById('hospi-date-wrap');
+    if (w) w.style.display = 'block';
+  }
 }
 
 async function toggleSystemFromCtrl() {
@@ -808,12 +804,26 @@ let medecinUnlocked = false;
 let pendingTab = null;
 
 function switchTab(page, el) {
-  if ((page === 'medecin' || page === 'controles') && !medecinUnlocked) {
+  if (page === 'medecin' && !medecinUnlocked) {
     pendingTab = { page, el };
     openPinOverlay();
     return;
   }
   _doSwitchTab(page, el);
+}
+
+function demanderPinControles() {
+  if (medecinUnlocked) {
+    afficherSectionMedecin();
+    return;
+  }
+  pendingTab = { action: 'ctrl-medecin' };
+  openPinOverlay();
+}
+
+function afficherSectionMedecin() {
+  document.getElementById('ctrl-medecin-locked').style.display = 'none';
+  document.getElementById('ctrl-medecin-content').style.display = 'block';
 }
 
 function _doSwitchTab(page, el) {
@@ -991,7 +1001,11 @@ function pinKey(k) {
         medecinUnlocked = true;
         document.getElementById('pin-overlay').classList.remove('open');
         if (pendingTab) {
-          _doSwitchTab(pendingTab.page, pendingTab.el);
+          if (pendingTab.action === 'ctrl-medecin') {
+            afficherSectionMedecin();
+          } else {
+            _doSwitchTab(pendingTab.page, pendingTab.el);
+          }
           pendingTab = null;
         }
       } else {
