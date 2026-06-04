@@ -568,7 +568,6 @@ function renderPatientPage(patients, prises, stock, alertes) {
     <div class="metric"><div class="metric-label">Prises aujourd'hui</div><div class="metric-val">${count} <span style="font-size:15px;color:var(--text-tertiary);font-weight:400">/ ${total}</span></div><span class="pill ${restantes > 0 ? 'pill-warn' : 'pill-ok'}"><span class="pill-dot"></span>${restantes > 0 ? restantes + ' restante(s)' : 'Complet'}</span></div>
     
     `;
-    }).join('');
   }
 
   // Compartiments semaine
@@ -623,7 +622,6 @@ function renderMedecinPage(patients, prises, stock, alertes, observance) {
       const pct = data.total > 0 ? Math.round((data.pris / data.total) * 100) : 0;
       const color = pct >= 100 ? 'var(--green-dot)' : pct >= 50 ? 'var(--amber-dot)' : 'var(--red-dot)';
       return `<div class="bar-row"><div class="bar-day">${nom}</div><div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div><div class="bar-count">${data.pris}/${data.total}</div></div>`;
-    }).join('');
   }
 
   // Patient info
