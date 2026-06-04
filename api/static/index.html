@@ -220,7 +220,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <div class="setting-row"><div><div class="setting-label">Mode sombre</div><div class="setting-sub">Interface en thème foncé</div></div><button class="toggle" id="dark-toggle" onclick="toggleDark()"></button></div>
       <div class="setting-row"><div><div class="setting-label">Notifications push</div><div class="setting-sub">Alertes doses manquées</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
       <div class="setting-row"><div><div class="setting-label">Rappel soir</div><div class="setting-sub">Rappel automatique à 19h30</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      <div class="setting-row"><div><div class="setting-label">Alerte stock bas</div><div class="setting-sub">Seuil : moins de 10 comprimés</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
       <div class="setting-row"><div><div class="setting-label">ML automatique</div><div class="setting-sub">Exécution quotidienne à minuit</div></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
     </div>
     <div class="modal-footer"><button class="btn btn-primary" onclick="closeSettings()">Enregistrer</button></div>
@@ -526,17 +525,16 @@ function dotForStatut(s) {
 // CHARGEMENT DONNÉES
 // ══════════════════════════════════════════════════
 async function loadAll() {
-  const [patients, prises, stock, alertes, observance, config] = await Promise.all([
+  const [patients, prises, alertes, observance, config] = await Promise.all([
     api('/patients'),
     api('/prises/today'),
-    api('/stock'),
     api('/alertes'),
     api('/observance'),
     api('/config/status'),
   ]);
 
-  renderPatientPage(patients, prises, stock, alertes);
-  renderMedecinPage(patients, prises, stock, alertes, observance);
+  renderPatientPage(patients, prises , alertes);
+  renderMedecinPage(patients, prises, alertes, observance);
   renderHistorique(alertes);
   renderNotifications(alertes);
   renderBanners(config);
@@ -553,7 +551,7 @@ async function loadAll() {
 // ══════════════════════════════════════════════════
 // PAGE PATIENT
 // ══════════════════════════════════════════════════
-function renderPatientPage(patients, prises, stock, alertes) {
+function renderPatientPage(patients, prises, alertes) {
   const now = new Date();
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '' };
 
@@ -565,14 +563,9 @@ function renderPatientPage(patients, prises, stock, alertes) {
   const count = prises?.count || 0;
   const total = prises?.total || 3;
   const restantes = total - count;
-  const stockQte = stock?.quantite || '—';
-  const stockAlerte = stock?.alerte || false;
 
   document.getElementById('patient-metrics').innerHTML = `
-    <div class="metric"><div class="metric-label">Prises aujourd'hui</div><div class="metric-val">${count} <span style="font-size:15px;color:var(--text-tertiary);font-weight:400">/ ${total}</span></div><span class="pill ${restantes > 0 ? 'pill-warn' : 'pill-ok'}"><span class="pill-dot"></span>${restantes > 0 ? restantes + ' restante(s)' : 'Complet'}</span></div>
-    <div class="metric"><div class="metric-label">Stock restant</div><div class="metric-val">${stockQte} <span style="font-size:13px;color:var(--text-tertiary);font-weight:400">cpmt</span></div>${stockAlerte ? '<span class="pill pill-danger"><span class="pill-dot"></span>Stock bas</span>' : '<span class="pill pill-ok"><span class="pill-dot"></span>OK</span>'}</div>
-    <div class="metric"><div class="metric-label">Médicament</div><div class="metric-val" style="font-size:14px">${stock?.medicament || '—'}</div><div class="metric-sub">${stock?.dosage || ''}</div></div>
-  `;
+    <div class="metric"><div class="metric-label">Prises aujourd'hui</div><div class="metric-val">${count} <span style="font-size:15px;color:var(--text-tertiary);font-weight:400">/ ${total}</span></div><span class="pill ${restantes > 0 ? 'pill-warn' : 'pill-ok'}"><span class="pill-dot"></span>${restantes > 0 ? restantes + ' restante(s)' : 'Complet'}</span></div>  `;
 
   // Doses du jour
   const dosesDiv = document.getElementById('doses-today');
@@ -632,7 +625,7 @@ function renderCompGrid(prises) {
 // ══════════════════════════════════════════════════
 // PAGE MÉDECIN
 // ══════════════════════════════════════════════════
-function renderMedecinPage(patients, prises, stock, alertes, observance) {
+function renderMedecinPage(patients, prises, alertes, observance) {
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '', medecin: '' };
   document.getElementById('medecin-sub').textContent = `Patient : ${p.prenom} ${p.nom} · ${formatDate(new Date())}`;
 
@@ -642,7 +635,6 @@ function renderMedecinPage(patients, prises, stock, alertes, observance) {
   document.getElementById('medecin-metrics').innerHTML = `
     <div class="metric"><div class="metric-label">Observance 7j</div><div class="metric-val">${obs}<span style="font-size:13px;color:var(--text-tertiary);font-weight:400">%</span></div><span class="pill ${obs >= 80 ? 'pill-ok' : obs >= 60 ? 'pill-warn' : 'pill-danger'}"><span class="pill-dot"></span>${obs >= 80 ? 'Bonne' : obs >= 60 ? 'Moyenne' : 'Faible'}</span></div>
     <div class="metric"><div class="metric-label">Doses manquées</div><div class="metric-val">${manquees}</div><div class="metric-sub">dernières alertes</div></div>
-    <div class="metric"><div class="metric-label">Stock</div><div class="metric-val">${stock?.quantite || '—'}</div>${stock?.alerte ? '<span class="pill pill-danger"><span class="pill-dot"></span>Renouveler</span>' : '<span class="pill pill-ok"><span class="pill-dot"></span>OK</span>'}</div>
     <div class="metric"><div class="metric-label">Médecin</div><div class="metric-val" style="font-size:14px">${p.medecin || 'Dr. —'}</div></div>
   `;
 
@@ -664,7 +656,6 @@ function renderMedecinPage(patients, prises, stock, alertes, observance) {
     <div class="detail-grid">
       <div class="detail-item"><div class="detail-item-label">Nom</div><div class="detail-item-val">${p.prenom} ${p.nom}</div></div>
       <div class="detail-item"><div class="detail-item-label">ID</div><div class="detail-item-val" style="font-family:'DM Mono',monospace">#${String(p.id).padStart(3,'0')}</div></div>
-      <div class="detail-item"><div class="detail-item-label">Médicament</div><div class="detail-item-val">${stock?.medicament || '—'} ${stock?.dosage || ''}</div></div>
       <div class="detail-item"><div class="detail-item-label">Médecin</div><div class="detail-item-val">${p.medecin || '—'}</div></div>
     </div>
   `;
