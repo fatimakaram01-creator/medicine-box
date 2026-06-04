@@ -6,9 +6,21 @@ from db.database import get_connection
 # CONFIGURATION GLOBALE
 # ══════════════════════════════════════════════════════════════
 
+# Intervalles prescrits par le médecin (en minutes depuis minuit)
+# Ex: matin = 06:00 (360 min) → 11:00 (660 min)
+# HARDCODÉ intentionnellement : le seed sert uniquement à générer
+# des données d'entraînement fictives pour le ML (simulation 90 jours).
+# En production réelle, le patient utilise le vrai système pendant
+# 90 jours et le ML s'entraîne sur ses vraies données.
+INTERVALLE_MEDECIN = {
+    'matin': (6 * 60, 11 * 60),     # 06:00 → 11:00
+    'midi':  (11 * 60, 16 * 60),    # 11:00 → 16:00
+    'soir':  (19 * 60, 22 * 60)     # 19:00 → 22:00
+}
+
 # Phase découverte : durée en jours
-# Pendant cette phase, les alertes sont envoyées au milieu de l'intervalle
-# (±15 min) pour explorer les habitudes du patient sans a priori
+# Pendant cette phase, les alertes sont envoyées aléatoirement
+# sur TOUT l'intervalle médecin pour explorer les habitudes du patient
 JOURS_DECOUVERTE = 7
 
 # Fenêtre glissante pour calculer la moyenne du patient
@@ -33,82 +45,6 @@ NB_COMPRIMES = {
     'midi':  1,
     'soir':  1
 }
-
-
-# ══════════════════════════════════════════════════════════════
-# LECTURE DU PROFIL HORAIRE ACTIF
-# ══════════════════════════════════════════════════════════════
-
-def lire_intervalle_medecin():
-    """
-    Lit les plages horaires du profil actif depuis la table
-    intervalles_profils (Supabase).
-
-    Retourne un dict : {moment: (debut_minutes, fin_minutes)}
-    Les plages désactivées (00:00→00:00) sont ignorées.
-
-    Fallback sur les valeurs par défaut si aucun profil actif :
-      matin  06:00→11:00
-      midi   11:00→16:00
-      soir   19:00→22:00
-    """
-    conn = get_connection()
-    try:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT matin_debut, matin_fin,
-                   midi_debut,  midi_fin,
-                   soir_debut,  soir_fin
-            FROM intervalles_profils
-            WHERE actif = TRUE;
-        """)
-        row = cursor.fetchone()
-        cursor.close()
-
-        if not row:
-            print("⚠️ Aucun profil actif → intervalles par défaut")
-            return {
-                'matin': (6 * 60, 11 * 60),
-                'midi':  (11 * 60, 16 * 60),
-                'soir':  (19 * 60, 22 * 60),
-            }
-
-        def to_minutes(t):
-            """Convertit un objet time en minutes depuis minuit"""
-            if not t or (t.hour == 0 and t.minute == 0):
-                return None  # plage désactivée
-            return t.hour * 60 + t.minute
-
-        result = {}
-        noms   = ['matin', 'midi', 'soir']
-        # row = (matin_debut, matin_fin, midi_debut, midi_fin, soir_debut, soir_fin)
-        for i, nom in enumerate(noms):
-            debut = to_minutes(row[i * 2])
-            fin   = to_minutes(row[i * 2 + 1])
-            if debut is not None and fin is not None:
-                result[nom] = (debut, fin)
-            # sinon plage désactivée → on l'ignore
-
-        if not result:
-            print("⚠️ Toutes les plages sont désactivées → fallback")
-            return {
-                'matin': (6 * 60, 11 * 60),
-                'midi':  (11 * 60, 16 * 60),
-                'soir':  (19 * 60, 22 * 60),
-            }
-
-        print(f"✅ Profil actif chargé : {list(result.keys())}")
-        return result
-
-    except Exception as e:
-        print(f"❌ Erreur lecture profil actif : {e} → fallback")
-        return {
-            'matin': (6 * 60, 11 * 60),
-            'midi':  (11 * 60, 16 * 60),
-            'soir':  (19 * 60, 22 * 60),
-        }
-    finally:
-        conn.close()
 
 
 # ══════════════════════════════════════════════════════════════
@@ -150,16 +86,13 @@ def calculer_moyenne_patient(historique_heures):
     return total // len(historique_heures)
 
 
-def generer_heure_alerte(jour_index, moment, historique_prises, intervalle_medecin):
+def generer_heure_alerte(jour_index, moment, historique_prises):
     """
-    Génère l'heure d'alerte selon la phase du système.
-
-    Reçoit intervalle_medecin en paramètre (lu depuis le profil actif)
-    pour s'adapter dynamiquement si le médecin change les plages.
+    Génère l'heure d'alerte selon la phase du système :
 
     PHASE 1 — Découverte (jours 0 à 6) :
         Le système ne connaît pas encore le patient.
-        → Alerte au milieu de l'intervalle ±15 min
+        → Alerte au milieu de l'intervalle médecin ±15 min
         → But : explorer quand le patient prend réellement ses doses
 
     PHASE 2 — Adaptée (jours 7+) :
@@ -170,25 +103,25 @@ def generer_heure_alerte(jour_index, moment, historique_prises, intervalle_medec
                → alertes à 06:50, 07:30, 07:05, 07:40...
 
     RÉADAPTATION AUTOMATIQUE :
-        La fenêtre glissante (7 jours) recalcule automatiquement.
-        Si le profil change (Ramadan, Night Shift...), les nouvelles
-        plages sont prises en compte immédiatement.
+        La fenêtre glissante (7 jours) fait que si les habitudes
+        changent (Ramadan, vacances...), le système recalcule la
+        moyenne sur la dernière semaine et se réadapte.
 
     Retourne : (heure_en_minutes, phase_str)
     """
-    debut, fin = intervalle_medecin[moment]
+    debut, fin = INTERVALLE_MEDECIN[moment]
     milieu = (debut + fin) // 2
 
     # ── Phase 1 : Découverte ──
     if jour_index < JOURS_DECOUVERTE:
         # Alerte au MILIEU de l'intervalle ±15 min
-        # Légère variation pour avoir des données variées
         heure = milieu + random.randint(-15, 15)
         heure = max(debut, min(fin, heure))
         return heure, 'decouverte'
 
     # ── Phase 2 : Adaptée ──
     # Fenêtre glissante : on ne prend que les N derniers jours
+    # pour capter les changements d'habitudes récents
     prises_recentes = historique_prises[-FENETRE_ADAPTATION:]
     moyenne = calculer_moyenne_patient(prises_recentes)
 
@@ -212,7 +145,7 @@ def calculer_efficacite_alerte(prise, heure_reelle, heure_alerte_dt):
 
     Logique métier :
     - Patient n'a pas pris sa dose       → False (alerte n'a pas marché)
-    - delai < 0  → prise AVANT l'alerte  → False (alerte inutile, il avait déjà pris)
+    - delai < 0  → prise AVANT l'alerte  → False (alerte inutile)
     - delai = 0  → prise à l'heure       → True  (parfait)
     - 0 < delai < 120 → prise dans 2h    → True  (alerte efficace)
     - delai ≥ 120 → prise trop tardive   → False (alerte n'a pas suffi)
@@ -225,12 +158,10 @@ def calculer_efficacite_alerte(prise, heure_reelle, heure_alerte_dt):
     delai = int((heure_reelle - heure_alerte_dt).total_seconds() / 60)
 
     if delai < 0:
-        # Prise avant l'alerte → l'alerte était inutile
         return None, False
     elif delai == 0:
         return 0, True
     else:
-        # Efficace si prise dans les 2 heures après l'alerte
         return delai, delai < 120
 
 
@@ -249,14 +180,6 @@ def seed_data():
         cursor.close()
         conn.close()
         return
-
-    # ── Lire le profil horaire actif depuis Supabase ──
-    # C'est la source de vérité pour les intervalles.
-    # Si le médecin a créé un profil "Ramadan" ou "Night Shift",
-    # le seed génère les données en cohérence avec ces plages.
-    INTERVALLE_MEDECIN = lire_intervalle_medecin()
-    moments_actifs = list(INTERVALLE_MEDECIN.keys())
-    print(f"📋 Moments actifs pour ce seed : {moments_actifs}")
 
     # ──────────────────────────────────────────────────────
     # 1. PATIENT
@@ -283,7 +206,8 @@ def seed_data():
     # ──────────────────────────────────────────────────────
     # 3. PRESCRIPTION
     # 90 jours passés (données historiques pour entraîner le ML)
-    # + 30 jours futurs (pour les prédictions)
+    # + 30 jours futurs (pour que tache_generation_prises
+    #   puisse créer les vraies prises du jour)
     # ──────────────────────────────────────────────────────
     date_debut = datetime.now() - timedelta(days=90)
     date_fin   = datetime.now() + timedelta(days=30)
@@ -302,28 +226,32 @@ def seed_data():
 
     # ──────────────────────────────────────────────────────
     # 4. DOSES PRESCRITES
-    # Générées selon les plages du profil actif.
-    # Si une plage est désactivée → pas de dose pour ce moment.
-    # heure_prevue = milieu de la plage (référence prescription)
+    # 3 moments/jour avec intervalles définis par le médecin
+    # heure_prevue = milieu de l'intervalle (référence prescription)
+    # heure_optimisee = NULL → sera rempli par le ML n°3
     # ──────────────────────────────────────────────────────
-    for moment, (debut_min, fin_min) in INTERVALLE_MEDECIN.items():
+    doses_config = [
+        ('matin', 2),   # 2 comprimés le matin
+        ('midi',  1),   # 1 comprimé le midi
+        ('soir',  1),   # 1 comprimé le soir
+    ]
+
+    for moment, quantite in doses_config:
+        debut_min, fin_min = INTERVALLE_MEDECIN[moment]
         milieu_min = (debut_min + fin_min) // 2
-        heure_debut_str = f"{debut_min // 60:02d}:{debut_min % 60:02d}"
-        heure_fin_str   = f"{fin_min   // 60:02d}:{fin_min   % 60:02d}"
-        heure_milieu_str = f"{milieu_min // 60:02d}:{milieu_min % 60:02d}"
-        nb = NB_COMPRIMES.get(moment, 1)
+        heure_prevue_str = f"{milieu_min // 60:02d}:{milieu_min % 60:02d}"
 
         cursor.execute("""
             INSERT INTO prescription_doses (
                 prescription_id, medicament_id, moment,
                 heure_prevue, quantite
             ) VALUES (%s, %s, %s, %s, %s);
-        """, (prescription_id, medicament_id, moment, heure_milieu_str, nb))
+        """, (prescription_id, medicament_id, moment, heure_prevue_str, quantite))
 
     # ──────────────────────────────────────────────────────
     # 5. GÉNÉRATION DES 90 JOURS DE DONNÉES
     #
-    # Pour chaque jour × chaque moment actif :
+    # Pour chaque jour × chaque moment :
     #   a) Générer une prise (réussie ou manquée)
     #   b) Stocker l'heure réelle pour l'apprentissage
     #   c) Générer une alerte adaptative (découverte ou adaptée)
@@ -333,7 +261,11 @@ def seed_data():
     # Historique par moment : stocke les heures réelles de prise
     # pour que generer_heure_alerte() puisse calculer la moyenne
     # ──────────────────────────────────────────────────────
-    historique = {m: [] for m in moments_actifs}
+    historique = {
+        'matin': [],
+        'midi':  [],
+        'soir':  []
+    }
 
     # Compteurs pour le résumé final
     total_prises = 0
@@ -343,22 +275,22 @@ def seed_data():
         date_jour    = date_debut + timedelta(days=jour)
         jour_semaine = date_jour.weekday()  # 0=lundi ... 6=dimanche
 
-        for moment in moments_actifs:
+        for moment in ['matin', 'midi', 'soir']:
             debut_min, fin_min = INTERVALLE_MEDECIN[moment]
 
-            # ── a) Heure prévue = milieu de l'intervalle ──
+            # ── a) Heure prévue = milieu de l'intervalle médecin ──
             milieu = (debut_min + fin_min) // 2
             heure_prevue = minutes_to_datetime(date_jour, milieu)
 
             # ── b) Simuler si le patient prend sa dose ou non ──
-            prise = random.random() < PROBA_PRISE.get(moment, 0.80)
+            prise = random.random() < PROBA_PRISE[moment]
 
             # Poids mesuré par la cellule de charge (capteur IoT)
             poids_avant = round(random.uniform(11.5, 13.0), 2)
 
             if prise:
                 # Le patient ouvre la boîte et prend ses comprimés
-                # Heure réelle = aléatoire dans la plage prescrite
+                # Heure réelle = aléatoire dans l'intervalle prescrit
                 minutes_reelles = random.randint(debut_min, fin_min)
                 heure_reelle = datetime(
                     date_jour.year, date_jour.month, date_jour.day,
@@ -367,7 +299,9 @@ def seed_data():
                     random.randint(0, 59)
                 )
                 # Δpoids > 0 → dose prise (détecté par ML n°1)
-                poids_apres = round(poids_avant - random.uniform(2.0, 2.5), 2)
+                poids_apres = round(
+                    poids_avant - random.uniform(2.0, 2.5), 2
+                )
                 statut = 'pris'
             else:
                 # Dose manquée → pas d'ouverture détectée
@@ -397,7 +331,8 @@ def seed_data():
                 """, (
                     patient_id,
                     'dose_manquee',
-                    f"Dose {moment} manquee - {date_jour.strftime('%d/%m/%Y')}"
+                    f"Dose {moment} manquee - "
+                    f"{date_jour.strftime('%d/%m/%Y')}"
                 ))
 
             # ── e) Stocker l'heure réelle pour l'apprentissage ──
@@ -415,12 +350,11 @@ def seed_data():
             #   Ex : patient prend matin vers 07:15
             #        → alertes à 06:50, 07:30, 07:05...
             #
-            # RÉADAPTATION (changement de profil) :
-            #   La fenêtre glissante de 7 jours recalcule automatiquement.
-            #   Si le médecin active un nouveau profil, les nouvelles
-            #   plages sont utilisées pour les prochains jours.
+            # RÉADAPTATION (changement d'habitudes) :
+            #   La fenêtre glissante de 7 jours recalcule
+            #   automatiquement si les habitudes changent.
             alerte_minutes, phase = generer_heure_alerte(
-                jour, moment, historique[moment], INTERVALLE_MEDECIN
+                jour, moment, historique[moment]
             )
             heure_alerte_str = minutes_to_time_str(alerte_minutes)
             heure_alerte_dt  = minutes_to_datetime(date_jour, alerte_minutes)
@@ -457,17 +391,13 @@ def seed_data():
     cursor.close()
     conn.close()
 
-    nb_comprimes_par_jour = sum(NB_COMPRIMES.get(m, 1) for m in moments_actifs)
-
     print("=" * 50)
     print("  SEED TERMINÉ AVEC SUCCÈS")
     print("=" * 50)
     print(f"  Patient ID         : {patient_id}")
     print(f"  Prescription ID    : {prescription_id}")
-    print(f"  Moments actifs     : {moments_actifs}")
-    print(f"  Prises/jour        : {nb_comprimes_par_jour}")
-    print(f"  Prises générées    : {total_prises} lignes (90j × {len(moments_actifs)} moments)")
-    print(f"  Alertes optim      : {total_alertes_optim} lignes")
+    print(f"  Prises générées    : {total_prises} lignes (90j × 3 moments)")
+    print(f"  Alertes optim      : {total_alertes_optim} lignes (90j × 3 moments)")
     print(f"  Phase découverte   : jours 1-{JOURS_DECOUVERTE}")
     print(f"  Phase adaptée      : jours {JOURS_DECOUVERTE + 1}-90")
     print(f"  Fenêtre adaptation : {FENETRE_ADAPTATION} jours glissants")
