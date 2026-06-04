@@ -532,8 +532,8 @@ async function loadAll() {
     api('/config/status'),
   ]);
 
-  renderPatientPage(patients, prises, alertes);
-  renderMedecinPage(patients, prises, alertes, observance);
+  renderPatientPage(patients, prises, null, alertes);
+  renderMedecinPage(patients, prises, null, alertes, observance);
   renderHistorique(alertes);
   renderNotifications(alertes);
   renderBanners(config);
@@ -550,7 +550,7 @@ async function loadAll() {
 // ══════════════════════════════════════════════════
 // PAGE PATIENT
 // ══════════════════════════════════════════════════
-function renderPatientPage(patients, prises, alertes) {
+function renderPatientPage(patients, prises, stock, alertes) {
   const now = new Date();
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '' };
 
@@ -599,7 +599,7 @@ function renderCompGrid(prises) {
 // ══════════════════════════════════════════════════
 // PAGE MÉDECIN
 // ══════════════════════════════════════════════════
-function renderMedecinPage(patients, prises, alertes, observance) {
+function renderMedecinPage(patients, prises, stock, alertes, observance) {
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '', medecin: '' };
   document.getElementById('medecin-sub').textContent = `Patient : ${p.prenom} ${p.nom} · ${formatDate(new Date())}`;
 
