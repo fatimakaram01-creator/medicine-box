@@ -410,6 +410,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
     </div>
+    <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Ou arrêter le traitement en cours :</div>
+      <button class="btn" onclick="arreterTraitement()" style="width:100%;color:var(--red-text);border-color:rgba(226,75,74,.3);background:var(--red-bg)">⛔ Arrêter le traitement actuel</button>
+    </div>
   </div>
   <div class="ctrl-card">
     <div class="section-label">Profil horaire</div>
@@ -808,6 +812,17 @@ async function changerRx() {
   };
   const res = await api('/config/changement-rx', { method: 'POST', body: JSON.stringify(data) });
   if (res) showToast(res.message || res.error);
+}
+
+async function arreterTraitement() {
+  if (!confirm('Confirmer l\'arrêt du traitement ? Le système sera mis en pause.')) return;
+  const res = await api('/config/arreter-traitement', { method: 'POST' });
+  if (res?.status === 'ok') {
+    showToast('⛔ ' + res.message);
+    loadAll();
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
 }
 
 // ══════════════════════════════════════════════════
