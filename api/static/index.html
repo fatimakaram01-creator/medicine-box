@@ -493,7 +493,7 @@ async function loadAll() {
 }
 
 // ══════════════════════════════════════════════════
-// PAGE PATIENT — avec 3 métriques : Prises + Observance + Risque ML
+// PAGE PATIENT — avec 3 métriques : Prises + Observance + Risque d'oubli
 // ══════════════════════════════════════════════════
 function renderPatientPage(patients, prises, alertes, observance) {
   const now = new Date();
@@ -520,7 +520,7 @@ function renderPatientPage(patients, prises, alertes, observance) {
       <span class="pill ${obs >= 80 ? 'pill-ok' : obs >= 60 ? 'pill-warn' : 'pill-danger'}"><span class="pill-dot"></span>${obs >= 80 ? 'Bonne' : obs >= 60 ? 'Moyenne' : 'Faible'}</span>
     </div>
     <div class="metric">
-      <div class="metric-label">Risque ML</div>
+      <div class="metric-label">Risque d'oubli</div>
       <div class="metric-val">—</div>
       <span class="pill pill-ok"><span class="pill-dot"></span>Faible</span>
     </div>
