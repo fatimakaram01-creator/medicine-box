@@ -428,9 +428,9 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500">
             <input type="checkbox" id="check-matin" checked onchange="togglePlage('matin')"> 🌅 Matin
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="time-group"><label>Début</label><input type="time" id="matin-debut" value="06:00"></div>
-            <div class="time-group"><label>Fin</label><input type="time" id="matin-fin" value="11:00"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Début</label><input type="time" id="matin-debut" value="06:00" style="width:100%;padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--text-primary);font-size:12px"></div>
+            <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Fin</label><input type="time" id="matin-fin" value="11:00" style="width:100%;padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--text-primary);font-size:12px"></div>
           </div>
         </div>
         <!-- Midi -->
@@ -438,9 +438,9 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500">
             <input type="checkbox" id="check-midi" checked onchange="togglePlage('midi')"> ☀️ Midi
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="time-group"><label>Début</label><input type="time" id="midi-debut" value="11:00"></div>
-            <div class="time-group"><label>Fin</label><input type="time" id="midi-fin" value="16:00"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Début</label><input type="time" id="midi-debut" value="11:00" style="width:100%;padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--text-primary);font-size:12px"></div>
+            <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Fin</label><input type="time" id="midi-fin" value="16:00" style="width:100%;padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--text-primary);font-size:12px"></div>
           </div>
         </div>
         <!-- Soir -->
@@ -448,9 +448,9 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
           <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;font-size:12px;font-weight:500">
             <input type="checkbox" id="check-soir" checked onchange="togglePlage('soir')"> 🌙 Soir
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <div class="time-group"><label>Début</label><input type="time" id="soir-debut" value="16:00"></div>
-            <div class="time-group"><label>Fin</label><input type="time" id="soir-fin" value="22:00"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Début</label><input type="time" id="soir-debut" value="16:00" style="width:100%;padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--text-primary);font-size:12px"></div>
+            <div style="flex:1;min-width:120px"><label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:4px">Fin</label><input type="time" id="soir-fin" value="22:00" style="width:100%;padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--surface);color:var(--text-primary);font-size:12px"></div>
           </div>
         </div>
       </div>
