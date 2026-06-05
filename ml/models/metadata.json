@@ -1,0 +1,27 @@
+{
+  "trained_at": "2026-06-05T22:44:50.617380",
+  "n_samples": 270,
+  "features": [
+    "heure_alerte_min",
+    "jour_semaine",
+    "moment_enc",
+    "phase_enc",
+    "is_weekend",
+    "heure_norm"
+  ],
+  "moment_classes": [
+    "matin",
+    "midi",
+    "soir"
+  ],
+  "phase_classes": [
+    "adapte",
+    "decouverte"
+  ],
+  "stats": {
+    "heure_alerte_mean": 847.4444444444445,
+    "heure_alerte_std": 300.4714923581777,
+    "delai_mean": 61.05,
+    "alerte_efficace_rate": 0.37407407407407406
+  }
+}

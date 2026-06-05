@@ -811,3 +811,32 @@ def activer_profil(profil_id: int):
         return {"error": str(e)}
     finally:
         conn.close()
+
+# ══════════════════════════════════════════════════
+# ML — PREDICT
+# ══════════════════════════════════════════════════
+@router.get("/ml/predict")
+def ml_predict():
+    """Retourne le risque d'oubli et l'heure optimale d'alerte via ML"""
+    try:
+        import sys, os
+        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from ml.predict import predict, models_exist
+        if not models_exist():
+            return {
+                "risque_oubli": None,
+                "niveau_risque": "—",
+                "heure_optimale": None,
+                "anomalie": False,
+                "error": "Modèles non entraînés"
+            }
+        result = predict()
+        return result
+    except Exception as e:
+        return {
+            "risque_oubli": None,
+            "niveau_risque": "—",
+            "heure_optimale": None,
+            "anomalie": False,
+            "error": str(e)
+        }
