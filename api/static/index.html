@@ -607,11 +607,42 @@ async function loadAll() {
     renderPrescriptionPatient(rx);
     renderPrescriptionMedecin(rx);
   }
+
+  const ml = await api('/ml/predict');
+  if (ml && !ml.error) renderMLRisque(ml);
 }
 
 // ══════════════════════════════════════════════════
 // PAGE PATIENT — avec 3 métriques : Prises + Observance + Risque d'oubli
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// ML — RISQUE D'OUBLI
+// ══════════════════════════════════════════════════
+function renderMLRisque(ml) {
+  const val  = document.getElementById('risque-val');
+  const pill = document.getElementById('risque-pill');
+  if (!val || !pill) return;
+
+  const risque = ml.risque_oubli;
+  const niveau = ml.niveau_risque;
+
+  val.textContent = risque !== null ? risque + '%' : '—';
+
+  const pillCls = risque === null ? 'pill-ok'
+    : risque < 25 ? 'pill-ok'
+    : risque < 60 ? 'pill-warn'
+    : 'pill-danger';
+
+  pill.className = 'pill ' + pillCls;
+  pill.innerHTML = `<span class="pill-dot"></span>${niveau}`;
+
+  // Anomalie dans le titre si détectée
+  if (ml.anomalie) {
+    const metricEl = document.getElementById('metric-risque');
+    if (metricEl) metricEl.title = `⚠️ Comportement inhabituel détecté`;
+  }
+}
+
 function renderPatientPage(patients, prises, alertes, observance, hist) {
   const now = new Date();
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '' };
@@ -636,10 +667,10 @@ function renderPatientPage(patients, prises, alertes, observance, hist) {
       <div class="metric-val">${obs}<span style="font-size:14px;color:var(--text-tertiary);font-weight:400">%</span></div>
       <span class="pill ${obs >= 80 ? 'pill-ok' : obs >= 60 ? 'pill-warn' : 'pill-danger'}"><span class="pill-dot"></span>${obs >= 80 ? 'Bonne' : obs >= 60 ? 'Moyenne' : 'Faible'}</span>
     </div>
-    <div class="metric">
+    <div class="metric" id="metric-risque">
       <div class="metric-label">Risque d'oubli</div>
-      <div class="metric-val">—</div>
-      <span class="pill pill-ok"><span class="pill-dot"></span>Faible</span>
+      <div class="metric-val" id="risque-val">—</div>
+      <span class="pill pill-ok" id="risque-pill"><span class="pill-dot"></span>Chargement...</span>
     </div>
   `;
 
