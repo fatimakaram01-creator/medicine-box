@@ -485,12 +485,16 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="sub-tabs">
     <div class="sub-tab active" onclick="switchSubTab('prises',this)">Prises</div>
     <div class="sub-tab" onclick="switchSubTab('alertes',this)">Alertes</div>
+    <div class="sub-tab" onclick="switchSubTab('prescriptions',this)">Prescriptions</div>
   </div>
   <div class="sub-page active" id="sub-prises">
     <div class="card" id="hist-prises"><div class="loading">Chargement...</div></div>
   </div>
   <div class="sub-page" id="sub-alertes">
     <div class="card" id="hist-alertes"><div class="loading">Chargement...</div></div>
+  </div>
+  <div class="sub-page" id="sub-prescriptions">
+    <div class="card" id="hist-prescriptions"><div class="loading">Chargement...</div></div>
   </div>
 </div>
 
@@ -594,6 +598,9 @@ async function loadAll() {
     renderProfilsHistorique(profils);   // → page médecin
     renderProfilActifMedecin(profils);  // → page médecin lecture seule
   }
+
+  const rxHist = await api('/prescriptions/historique');
+  if (rxHist) renderHistPrescriptions(rxHist);
 
   const rx = await api('/prescription/active');
   if (rx) {
@@ -768,6 +775,36 @@ function renderMedecinPage(patients, prises, alertes, observance) {
 // ══════════════════════════════════════════════════
 // PAGE HISTORIQUE
 // ══════════════════════════════════════════════════
+function renderHistPrescriptions(prescriptions) {
+  const div = document.getElementById('hist-prescriptions');
+  if (!div) return;
+  if (!Array.isArray(prescriptions) || !prescriptions.length) {
+    div.innerHTML = '<div class="loading">Aucune prescription enregistrée</div>';
+    return;
+  }
+  div.innerHTML = prescriptions.map(p => {
+    const isActive = p.active && new Date(p.date_fin) >= new Date();
+    const isExpired = !isActive;
+    const duree = p.duree_jours > 0 ? `${p.duree_jours} jour(s)` : '—';
+    return `
+      <div class="tl-row">
+        <div class="tl-dot" style="background:${isActive ? 'var(--green-dot)' : 'var(--gray-dot)'}"></div>
+        <div class="tl-info">
+          <div class="tl-name">💊 ${p.medicament} <span style="font-size:11px;color:var(--text-secondary);font-weight:400">${p.dosage}</span></div>
+          <div class="tl-sub">${p.nb_prises_jour} prise(s)/jour · ${p.medecin}</div>
+          <div class="tl-sub" style="margin-top:2px">Du ${p.date_debut} → ${p.date_fin} · <strong>${duree}</strong></div>
+        </div>
+        <div class="tl-right">
+          ${isActive
+            ? '<span class="pill pill-ok"><span class="pill-dot"></span>Active</span>'
+            : '<span class="pill" style="background:var(--bg);color:var(--text-tertiary)"><span class="pill-dot" style="background:var(--gray-dot)"></span>Expirée</span>'
+          }
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 function renderHistPrises(hist) {
   const div = document.getElementById('hist-prises');
   if (!Array.isArray(hist) || !hist.length) { div.innerHTML = '<div class="loading">Aucune prise enregistrée</div>'; return; }

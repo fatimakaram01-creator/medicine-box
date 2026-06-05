@@ -642,6 +642,51 @@ def get_profil_actif():
         conn.close()
 
 
+
+@router.get("/prescriptions/historique")
+def get_prescriptions_historique():
+    """Retourne toutes les prescriptions du patient avec durée d'activation"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM patients LIMIT 1;")
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            return []
+        patient_id = row[0]
+        cursor.execute("""
+            SELECT p.id, p.medecin, p.date_debut::text, p.date_fin::text,
+                   p.active, m.nom, m.dosage,
+                   COUNT(pd.id) as nb_prises_jour,
+                   (p.date_fin - p.date_debut) as duree_jours
+            FROM prescriptions p
+            LEFT JOIN prescription_doses pd ON pd.prescription_id = p.id
+            LEFT JOIN medicaments m ON m.id = pd.medicament_id
+            WHERE p.patient_id = %s
+            GROUP BY p.id, p.medecin, p.date_debut, p.date_fin,
+                     p.active, m.nom, m.dosage
+            ORDER BY p.date_debut DESC;
+        """, (patient_id,))
+        rows = cursor.fetchall()
+        cursor.close()
+        return [{
+            "id": r[0],
+            "medecin": r[1],
+            "date_debut": r[2],
+            "date_fin": r[3],
+            "active": r[4],
+            "medicament": r[5] or "—",
+            "dosage": r[6] or "—",
+            "nb_prises_jour": r[7],
+            "duree_jours": r[8].days if r[8] else 0
+        } for r in rows]
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
 @router.get("/intervalles/profils")
 def get_intervalles_profils():
     """Retourne tous les profils d'intervalles (historique complet)"""
