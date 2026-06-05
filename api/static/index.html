@@ -417,7 +417,7 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
         <option value="2">2 prises / jour</option>
         <option value="3" selected>3 prises / jour</option>
       </select>
-      <input type="text" id="rx-medecin" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
+      <input type="text" id="rx-prescripteur" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
       <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
     </div>
@@ -823,7 +823,7 @@ async function changerRx() {
     medicament: document.getElementById('rx-medicament').value,
     dosage: document.getElementById('rx-dosage').value,
     frequence: parseInt(document.getElementById('rx-frequence').value),
-    prescrit_par: document.getElementById('rx-medecin').value,
+    prescrit_par: document.getElementById('rx-prescripteur').value,
     duree_jours: parseInt(document.getElementById('rx-duree').value)
   };
   const res = await api('/config/changement-rx', { method: 'POST', body: JSON.stringify(data) });
