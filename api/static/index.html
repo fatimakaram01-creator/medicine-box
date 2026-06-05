@@ -782,24 +782,48 @@ function renderHistPrescriptions(prescriptions) {
     div.innerHTML = '<div class="loading">Aucune prescription enregistrée</div>';
     return;
   }
+  const aujourd_hui = new Date();
+  aujourd_hui.setHours(0,0,0,0);
+
   div.innerHTML = prescriptions.map(p => {
-    const isActive = p.active && new Date(p.date_fin) >= new Date();
-    const isExpired = !isActive;
-    const duree = p.duree_jours > 0 ? `${p.duree_jours} jour(s)` : '—';
+    const dateDebut = new Date(p.date_debut);
+    const dateFin   = new Date(p.date_fin);
+    dateFin.setHours(0,0,0,0);
+
+    // Durée réelle en jours (date_fin - date_debut)
+    const dureeReelle = Math.round((dateFin - dateDebut) / (1000 * 60 * 60 * 24));
+
+    // Statut
+    const isActive   = p.active && dateFin >= aujourd_hui;
+    const isArretee  = !p.active;   // arrêtée manuellement par le médecin
+    const isExpiree  = p.active && dateFin < aujourd_hui; // durée normale écoulée
+
+    let pillHtml, statut;
+    if (isActive) {
+      pillHtml = '<span class="pill pill-ok"><span class="pill-dot"></span>Active</span>';
+      statut = `En cours · ${dureeReelle} jour(s) prévu(s)`;
+    } else if (isArretee) {
+      pillHtml = '<span class="pill pill-danger"><span class="pill-dot"></span>Arrêtée</span>';
+      statut = `Activée ${dureeReelle} jour(s) · arrêtée le ${p.date_fin}`;
+    } else {
+      pillHtml = '<span class="pill" style="background:var(--bg);color:var(--text-tertiary)"><span class="pill-dot" style="background:var(--gray-dot)"></span>Expirée</span>';
+      statut = `Durée complète · ${dureeReelle} jour(s)`;
+    }
+
     return `
       <div class="tl-row">
-        <div class="tl-dot" style="background:${isActive ? 'var(--green-dot)' : 'var(--gray-dot)'}"></div>
+        <div class="tl-dot" style="background:${isActive ? 'var(--green-dot)' : isArretee ? 'var(--red-dot)' : 'var(--gray-dot)'}"></div>
         <div class="tl-info">
           <div class="tl-name">💊 ${p.medicament} <span style="font-size:11px;color:var(--text-secondary);font-weight:400">${p.dosage}</span></div>
           <div class="tl-sub">${p.nb_prises_jour} prise(s)/jour · ${p.medecin}</div>
-          <div class="tl-sub" style="margin-top:2px">Du ${p.date_debut} → ${p.date_fin} · <strong>${duree}</strong></div>
+          <div class="tl-sub" style="margin-top:2px">
+            Du ${p.date_debut} → ${p.date_fin}
+          </div>
+          <div class="tl-sub" style="margin-top:2px;color:${isArretee ? 'var(--red-text)' : 'var(--text-tertiary)'}">
+            ${statut}
+          </div>
         </div>
-        <div class="tl-right">
-          ${isActive
-            ? '<span class="pill pill-ok"><span class="pill-dot"></span>Active</span>'
-            : '<span class="pill" style="background:var(--bg);color:var(--text-tertiary)"><span class="pill-dot" style="background:var(--gray-dot)"></span>Expirée</span>'
-          }
-        </div>
+        <div class="tl-right">${pillHtml}</div>
       </div>
     `;
   }).join('');
