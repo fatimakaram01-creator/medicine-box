@@ -8,6 +8,22 @@ from db.database import get_connection
 
 router = APIRouter()
 
+def get_patient_id_from_db(patient_id: int = None) -> int:
+    """Retourne le patient_id fourni ou le premier patient de la base"""
+    if patient_id:
+        return patient_id
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM patients ORDER BY id LIMIT 1;")
+        row = cursor.fetchone()
+        cursor.close()
+        return row[0] if row else None
+    finally:
+        conn.close()
+
+
+
 class ConfigToggle(BaseModel):
     enabled: bool
 
@@ -77,6 +93,139 @@ config_state = {
 }
 
 
+
+# ══════════════════════════════════════════════════
+# PATIENTS — CRUD
+# ══════════════════════════════════════════════════
+@router.get("/patients/liste")
+def liste_patients():
+    """Retourne tous les patients avec leur observance"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.id, p.nom, p.prenom, p.medecin,
+                   COUNT(pr.id) FILTER (WHERE pr.statut = 'pris'
+                     AND pr.heure_prevue >= NOW() - INTERVAL '7 days') as pris_7j,
+                   COUNT(pr.id) FILTER (WHERE pr.statut IN ('pris','manque')
+                     AND pr.heure_prevue >= NOW() - INTERVAL '7 days') as total_7j
+            FROM patients p
+            LEFT JOIN prises pr ON pr.patient_id = p.id
+            GROUP BY p.id, p.nom, p.prenom, p.medecin
+            ORDER BY p.id;
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        return [{
+            "id": r[0], "nom": r[1], "prenom": r[2], "medecin": r[3],
+            "observance_7j": round(r[4]/r[5]*100) if r[5] > 0 else 100
+        } for r in rows]
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.post("/patients/creer")
+def creer_patient(body: dict):
+    """Crée un nouveau patient et génère un code d'activation unique"""
+    import random
+    import string
+    from datetime import datetime
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+
+        # Générer un code unique : MB-YYYY-XXXX (ex: MB-2026-0047)
+        annee = datetime.now().year
+        while True:
+            numero = random.randint(1, 9999)
+            code = f"MB-{annee}-{numero:04d}"
+            # Vérifier unicité
+            cursor.execute("SELECT id FROM patients WHERE code_activation = %s;", (code,))
+            if not cursor.fetchone():
+                break  # code unique trouvé
+
+        cursor.execute("""
+            INSERT INTO patients (nom, prenom, medecin, code_activation)
+            VALUES (%s, %s, %s, %s) RETURNING id;
+        """, (body.get("nom",""), body.get("prenom",""), body.get("medecin",""), code))
+        new_id = cursor.fetchone()[0]
+        conn.commit()
+        cursor.close()
+        return {
+            "success": True,
+            "patient_id": new_id,
+            "code_activation": code,
+            "message": f"Patient créé — Code d'activation : {code}"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.post("/patients/activer-boite")
+def activer_boite(body: dict):
+    """
+    Reçu depuis la boîte ESP32 lors de la première configuration.
+    La boîte envoie le code d'activation saisi par le patient.
+    Retourne le patient_id correspondant.
+    """
+    code = body.get("code_activation", "").strip().upper()
+    if not code:
+        return {"success": False, "error": "Code manquant"}
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, prenom, nom FROM patients
+            WHERE code_activation = %s;
+        """, (code,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return {"success": False, "error": "Code invalide"}
+        return {
+            "success": True,
+            "patient_id": row[0],
+            "prenom": row[1],
+            "nom": row[2],
+            "message": f"Boîte liée à {row[1]} {row[2]}"
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/patients/code/{patient_id}")
+def get_code_patient(patient_id: int):
+    """Retourne le code d'activation d'un patient (pour le médecin)"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT code_activation, prenom, nom FROM patients WHERE id = %s;
+        """, (patient_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return {"error": "Patient introuvable"}
+        return {
+            "patient_id": patient_id,
+            "code_activation": row[0],
+            "prenom": row[1],
+            "nom": row[2]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
 @router.get("/")
 def home():
     return {"message": "Medicine Box API fonctionne !"}
@@ -98,16 +247,14 @@ def get_patients():
 
 
 @router.get("/prises/today")
-def get_prises_today():
+def get_prises_today(patient_id: int = None)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return {"error": "Aucun patient trouvé", "count": 0, "total": 0, "prises": []}
-        patient_id = row[0]
         cursor.execute("""
             SELECT moment, heure_prevue, heure_reelle, statut, poids_avant, poids_apres
             FROM prises
@@ -128,16 +275,14 @@ def get_prises_today():
 
 
 @router.get("/alertes")
-def get_alertes():
+def get_alertes(patient_id: int = None)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return {"error": "Aucun patient trouvé", "alertes": []}
-        patient_id = row[0]
         cursor.execute("""
             SELECT type, message, created_at, lu FROM alertes
             WHERE patient_id = %s ORDER BY created_at DESC LIMIT 10;
@@ -152,16 +297,14 @@ def get_alertes():
 
 
 @router.get("/observance")
-def get_observance():
+def get_observance(patient_id: int = None)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return {"error": "Aucun patient trouvé"}
-        patient_id = row[0]
         cursor.execute("""
             SELECT heure_prevue::date as jour, statut FROM prises
             WHERE patient_id = %s
@@ -190,16 +333,14 @@ def get_observance():
 
 
 @router.get("/prises/historique")
-def get_prises_historique():
+def get_prises_historique(patient_id: int = None)):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return []
-        patient_id = row[0]
         cursor.execute("""
             SELECT moment, heure_prevue, heure_reelle, statut, poids_avant, poids_apres
             FROM prises
@@ -216,12 +357,12 @@ def get_prises_historique():
 
 
 @router.get("/config/status")
-def get_config_status():
+def get_config_status(patient_id: int = None)):
     return config_state
 
 
 @router.post("/config/remplissage")
-def toggle_remplissage(body: ConfigToggle, request: Request):
+def toggle_remplissage(body: ConfigToggle, request: Request, patient_id: int = None):
     config_state["remplissage"] = body.enabled
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
     if mqtt_client and mqtt_client.is_connected():
@@ -230,7 +371,7 @@ def toggle_remplissage(body: ConfigToggle, request: Request):
 
 
 @router.post("/config/buzzer")
-def toggle_buzzer(body: ConfigToggle, request: Request):
+def toggle_buzzer(body: ConfigToggle, request: Request, patient_id: int = None):
     config_state["buzzer"] = body.enabled
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
     if mqtt_client and mqtt_client.is_connected():
@@ -239,7 +380,7 @@ def toggle_buzzer(body: ConfigToggle, request: Request):
 
 
 @router.post("/config/ramadan")
-def toggle_ramadan(body: ConfigRamadan, request: Request):
+def toggle_ramadan(body: ConfigRamadan, request: Request, patient_id: int = None):
     config_state["ramadan"] = body.enabled
     config_state["ramadan_ville"] = body.ville if body.enabled else None
     horaires_ramadan = {
@@ -265,7 +406,7 @@ def toggle_ramadan(body: ConfigRamadan, request: Request):
 
 
 @router.post("/config/hospitalisation")
-def toggle_hospitalisation(body: ConfigHospitalisation, request: Request):
+def toggle_hospitalisation(body: ConfigHospitalisation, request: Request, patient_id: int = None):
     config_state["hospitalisation"] = body.enabled
     config_state["hospitalisation_date_retour"] = body.date_retour if body.enabled else None
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
@@ -280,19 +421,17 @@ def toggle_hospitalisation(body: ConfigHospitalisation, request: Request):
 
 
 @router.post("/config/system")
-def toggle_system(body: ConfigToggle, request: Request):
+def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
 
     if body.enabled:
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM patients LIMIT 1;")
-            row = cursor.fetchone()
-            if not row:
+            patient_id = get_patient_id_from_db(patient_id)
+            if not patient_id:
                 cursor.close()
                 return {"status": "error", "message": "Aucun patient trouvé"}
-            patient_id = row[0]
             cursor.execute("""
                 SELECT id FROM prescriptions
                 WHERE patient_id = %s AND date_debut <= CURRENT_DATE AND date_fin >= CURRENT_DATE
@@ -353,13 +492,12 @@ def toggle_system(body: ConfigToggle, request: Request):
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM patients LIMIT 1;")
-            row = cursor.fetchone()
-            if row:
+            _pid2 = get_patient_id_from_db(None)
+            if _pid2:
                 cursor.execute("""
                     DELETE FROM prises
                     WHERE patient_id = %s AND heure_prevue::date = CURRENT_DATE AND statut = 'en_attente';
-                """, (row[0],))
+                """, (_pid2,))
                 conn.commit()
             cursor.close()
         except Exception as e:
@@ -381,16 +519,14 @@ def update_esp32_status(body: ConfigToggle):
 
 
 @router.post("/config/changement-rx")
-def changement_rx(body: ChangementRx):
+def changement_rx(body: ChangementRx, patient_id: int = None):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return {"error": "Aucun patient trouvé"}
-        patient_id = row[0]
 
         # ── Désactiver l'ancienne prescription active ──
         # Sans ça, l'ancienne et la nouvelle coexistent
@@ -454,7 +590,7 @@ def changement_rx(body: ChangementRx):
 
 
 @router.post("/config/arreter-traitement")
-def arreter_traitement():
+def arreter_traitement(, patient_id: int = None):
     """
     Arrête la prescription active du patient.
     - Met date_fin = aujourd'hui sur la prescription active
@@ -465,12 +601,10 @@ def arreter_traitement():
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return {"error": "Aucun patient trouvé"}
-        patient_id = row[0]
 
         # ── Désactiver la prescription active ──
         # date_fin = hier pour éviter conflit si nouvelle prescription créée le même jour
@@ -507,13 +641,12 @@ def creer_alerte_systeme(type_alerte, message):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if row:
+        _pid3 = get_patient_id_from_db(None)
+        if _pid3:
             cursor.execute("""
                 INSERT INTO alertes (patient_id, type, message, created_at, lu)
                 VALUES (%s, %s, %s, NOW(), FALSE);
-            """, (row[0], type_alerte, message))
+            """, (_pid3, type_alerte, message))
             conn.commit()
         cursor.close()
     except Exception as e:
@@ -572,17 +705,15 @@ def _get_moments_config():
 # ═══════════════════════════════════════════════════════
 
 @router.get("/prescription/active")
-def get_prescription_active():
+def get_prescription_active(patient_id: int = None)):
     """Retourne la prescription active du patient avec les détails"""
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return {"error": "Aucun patient"}
-        patient_id = row[0]
         cursor.execute("""
             SELECT p.id, p.medecin, p.date_debut::text, p.date_fin::text,
                    m.nom, m.dosage,
@@ -644,17 +775,15 @@ def get_profil_actif():
 
 
 @router.get("/prescriptions/historique")
-def get_prescriptions_historique():
+def get_prescriptions_historique(patient_id: int = None)):
     """Retourne toutes les prescriptions du patient avec durée d'activation"""
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if not row:
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
             cursor.close()
             return []
-        patient_id = row[0]
         cursor.execute("""
             SELECT p.id, p.medecin, p.date_debut::text, p.date_fin::text,
                    p.active, m.nom, m.dosage,
@@ -816,7 +945,7 @@ def activer_profil(profil_id: int):
 # ML — PREDICT
 # ══════════════════════════════════════════════════
 @router.get("/ml/predict")
-def ml_predict():
+def ml_predict(patient_id: int = None)):
     """Retourne le risque d'oubli et l'heure optimale d'alerte via ML"""
     try:
         import sys, os

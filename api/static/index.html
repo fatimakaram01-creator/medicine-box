@@ -200,6 +200,22 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 .profil-plages{display:flex;gap:6px;flex-wrap:wrap;font-size:11px;color:var(--text-secondary)}
 .profil-plage{background:var(--surface);border:0.5px solid var(--border);border-radius:20px;padding:2px 8px}
 .time-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+
+/* ── Multi-patients ── */
+.patient-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:16px}
+.patient-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:14px;cursor:pointer;transition:all .15s;text-align:center}
+.patient-card:hover{border-color:var(--teal);background:rgba(29,158,117,.04)}
+.patient-card.selected{border-color:var(--teal);border-width:1.5px;background:rgba(29,158,117,.07)}
+.patient-card.add-new{border-style:dashed;color:var(--text-tertiary);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:90px}
+.patient-card.add-new:hover{color:var(--teal);border-color:var(--teal)}
+.patient-avatar{width:40px;height:40px;border-radius:50%;background:var(--teal);color:#fff;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;margin:0 auto 8px}
+.patient-name{font-size:13px;font-weight:500;color:var(--text-primary);margin-bottom:2px}
+.patient-obs{font-size:11px;color:var(--text-secondary)}
+
+/* Formulaire nouveau patient */
+.new-patient-form{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:12px;display:none}
+.new-patient-form.open{display:block}
+
 .time-group{display:flex;flex-direction:column;gap:4px}
 .time-group label{font-size:11px;color:var(--text-secondary)}
 .time-group input{padding:6px 8px;border-radius:var(--radius-sm);border:0.5px solid var(--border-md);background:var(--bg);color:var(--text-primary);font-size:12px;font-family:'DM Sans',sans-serif;outline:none}
@@ -386,8 +402,32 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 <!-- ════════════ PAGE MÉDECIN ════════════ -->
 <div class="page" id="page-medecin">
   <div id="medecin-status-banner"></div>
+
+  <!-- Sélecteur patients -->
+  <div style="margin-bottom:16px">
+    <div class="section-label">Mes patients</div>
+    <div class="patient-cards" id="patient-cards-list">
+      <div class="loading">Chargement...</div>
+    </div>
+  </div>
+
+  <!-- Formulaire nouveau patient -->
+  <div class="new-patient-form" id="new-patient-form">
+    <div class="section-label">Nouveau patient</div>
+    <div class="input-wrap" style="margin-top:0">
+      <input type="text" id="np-prenom" placeholder="Prénom">
+      <input type="text" id="np-nom" placeholder="Nom">
+      <input type="text" id="np-medecin" placeholder="Médecin référent (ex: Dr. Saidi)">
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary" onclick="creerPatient()" style="flex:1">Créer le patient</button>
+        <button class="btn" onclick="fermerFormulairePatient()" style="flex:1">Annuler</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="medecin-status-banner-2"></div>
   <div class="page-header">
-    <div><div class="page-header-title">Dashboard médecin</div><div class="page-header-sub" id="medecin-sub"></div></div>
+    <div><div class="page-header-title" id="medecin-titre">Dashboard médecin</div><div class="page-header-sub" id="medecin-sub"></div></div>
     <div class="header-badges" id="medecin-badges"><span class="pill pill-ok"><span class="pill-dot"></span>Actif</span><span class="pill pill-info"><span class="pill-dot"></span>ESP32</span></div>
   </div>
   <div class="metrics-4" id="medecin-metrics"><div class="loading">Chargement...</div></div>
@@ -531,6 +571,8 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 
 <script>
 const API = 'https://medicine-box-zk7r.onrender.com';
+let selectedPatientId = null;  // patient actuellement sélectionné dans le dashboard médecin
+
 const REFRESH_MS = 30000;
 
 async function api(path, opts = {}) {
@@ -571,11 +613,22 @@ function dotForStatut(s) {
 }
 
 async function loadAll() {
+  // Charger liste patients pour le dashboard médecin
+  const patientsList = await api('/patients/liste');
+  if (patientsList && Array.isArray(patientsList)) {
+    renderPatientCards(patientsList);
+    // Sélectionner le premier patient par défaut si aucun sélectionné
+    if (!selectedPatientId && patientsList.length > 0) {
+      selectedPatientId = patientsList[0].id;
+    }
+  }
+
+  const pid = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
   const [patients, prises, alertes, observance, config] = await Promise.all([
     api('/patients'),
-    api('/prises/today'),
-    api('/alertes'),
-    api('/observance'),
+    api(`/prises/today${pid}`),
+    api(`/alertes${pid}`),
+    api(`/observance${pid}`),
     api('/config/status'),
   ]);
 
@@ -1172,6 +1225,107 @@ function renderMedecinStatus(config) {
 
   banner.innerHTML = bannerHtml;
   badges.innerHTML = badgesHtml;
+}
+
+// ══════════════════════════════════════════════════
+// MULTI-PATIENTS
+// ══════════════════════════════════════════════════
+function renderPatientCards(patients) {
+  const div = document.getElementById('patient-cards-list');
+  if (!div) return;
+
+  let html = patients.map(p => {
+    const initiales = (p.prenom[0] || '') + (p.nom[0] || '');
+    const isSelected = p.id === selectedPatientId;
+    const obsCls = p.observance_7j >= 80 ? 'pill-ok' : p.observance_7j >= 60 ? 'pill-warn' : 'pill-danger';
+    return `
+      <div class="patient-card ${isSelected ? 'selected' : ''}" onclick="selectionnerPatient(${p.id}, '${p.prenom} ${p.nom}')">
+        <div class="patient-avatar">${initiales.toUpperCase()}</div>
+        <div class="patient-name">${p.prenom} ${p.nom}</div>
+        <div class="patient-obs">${p.medecin || '—'}</div>
+        <div style="margin-top:6px">
+          <span class="pill ${obsCls}" style="font-size:10px"><span class="pill-dot"></span>${p.observance_7j}% obs.</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Bouton ajouter nouveau patient
+  html += `
+    <div class="patient-card add-new" onclick="ouvrirFormulairePatient()">
+      <div style="font-size:22px">+</div>
+      <div style="font-size:11px">Nouveau patient</div>
+    </div>
+  `;
+
+  div.innerHTML = html;
+}
+
+function selectionnerPatient(id, nom) {
+  selectedPatientId = id;
+  const titre = document.getElementById('medecin-titre');
+  if (titre) titre.textContent = `Dashboard — ${nom}`;
+  loadAll(); // Recharger toutes les données pour ce patient
+}
+
+function ouvrirFormulairePatient() {
+  document.getElementById('new-patient-form').classList.add('open');
+}
+
+function fermerFormulairePatient() {
+  document.getElementById('new-patient-form').classList.remove('open');
+  document.getElementById('np-prenom').value = '';
+  document.getElementById('np-nom').value = '';
+  document.getElementById('np-medecin').value = '';
+}
+
+async function creerPatient() {
+  const prenom = document.getElementById('np-prenom').value.trim();
+  const nom = document.getElementById('np-nom').value.trim();
+  const medecin = document.getElementById('np-medecin').value.trim();
+  if (!prenom || !nom) { showToast('Prénom et nom obligatoires'); return; }
+  const res = await api('/patients/creer', {
+    method: 'POST',
+    body: JSON.stringify({ prenom, nom, medecin })
+  });
+  if (res?.success) {
+    fermerFormulairePatient();
+    selectedPatientId = res.patient_id;
+    // Afficher le code d'activation dans une alerte visuelle
+    afficherCodeActivation(prenom, nom, res.code_activation);
+    loadAll();
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
+function afficherCodeActivation(prenom, nom, code) {
+  // Créer un overlay avec le code d'activation
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:600;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--surface);border-radius:var(--radius-lg);border:0.5px solid var(--border-md);width:340px;max-width:92vw;padding:24px;text-align:center">
+      <div style="font-size:28px;margin-bottom:8px">🎉</div>
+      <div style="font-size:15px;font-weight:600;margin-bottom:4px">${prenom} ${nom}</div>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:20px">Patient créé avec succès</div>
+
+      <div style="background:var(--bg);border-radius:var(--radius-md);padding:16px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Code d'activation</div>
+        <div style="font-size:24px;font-weight:700;font-family:'DM Mono',monospace;color:var(--teal);letter-spacing:2px">${code}</div>
+      </div>
+
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:16px;text-align:left;background:var(--amber-bg);border-radius:var(--radius-sm);padding:10px 12px;color:var(--amber-text)">
+        📋 <strong>Instructions :</strong><br>
+        1. Notez ou copiez ce code<br>
+        2. Donnez-le au patient<br>
+        3. Le patient le saisit lors de la configuration WiFi de la boîte
+      </div>
+
+      <button onclick="navigator.clipboard.writeText('${code}').then(()=>showToast('✅ Code copié'))" class="btn" style="width:100%;margin-bottom:8px;font-family:'DM Mono',monospace;font-weight:600">📋 Copier le code</button>
+      <button onclick="this.closest('[style*=fixed]').remove()" class="btn btn-primary" style="width:100%">Fermer</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
 }
 
 // ══════════════════════════════════════════════════

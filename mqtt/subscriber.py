@@ -102,10 +102,13 @@ def handle_prise(data):
     try:
         cursor = conn.cursor()
 
-        # Patient ID
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        patient_id = data.get("patient_id", row[0] if row else 1)
+        # Patient ID depuis le message MQTT ou premier patient par défaut
+        if "patient_id" in data:
+            patient_id = int(data["patient_id"])
+        else:
+            cursor.execute("SELECT id FROM patients ORDER BY id LIMIT 1;")
+            row = cursor.fetchone()
+            patient_id = row[0] if row else 1
 
         # Déterminer la date de la prise
         # Si "date" est présent → prise retardée depuis EEPROM
@@ -220,7 +223,7 @@ def handle_statut(data):
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM patients LIMIT 1;")
+            cursor.execute("SELECT id FROM patients ORDER BY id LIMIT 1;")
             row = cursor.fetchone()
             if row:
                 cursor.execute("""
@@ -270,9 +273,10 @@ def effacer_prises_deconnexion():
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM patients LIMIT 1;")
-        row = cursor.fetchone()
-        if row:
+        cursor.execute("SELECT id FROM patients ORDER BY id;")
+        patients = cursor.fetchall()
+        for row in patients:
+         if row:
             # Supprimer les prises en_attente qui traînent
             # (celles des jours passés qui n'ont jamais été résolues)
             cursor.execute("""

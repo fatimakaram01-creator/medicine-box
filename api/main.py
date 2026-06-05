@@ -157,15 +157,15 @@ async def tache_alertes(mqtt_client):
             try:
                 cursor = conn.cursor()
 
-                # Récupérer le patient_id (prototype = 1 seul patient)
-                cursor.execute("SELECT id FROM patients LIMIT 1;")
-                row = cursor.fetchone()
-                if not row:
+                # Multi-patients : traiter chaque patient
+                cursor.execute("SELECT id FROM patients ORDER BY id;")
+                all_patients = cursor.fetchall()
+                if not all_patients:
                     cursor.close()
                     conn.close()
                     await asyncio.sleep(60)
                     continue
-                patient_id = row[0]
+                for (patient_id,) in all_patients:
 
                 # ── Chercher les alertes prévues pour cette minute ──
                 #
@@ -326,14 +326,14 @@ async def tache_doses_manquees(mqtt_client):
             try:
                 cursor = conn.cursor()
 
-                cursor.execute("SELECT id FROM patients LIMIT 1;")
-                row = cursor.fetchone()
-                if not row:
+                cursor.execute("SELECT id FROM patients ORDER BY id;")
+                all_patients = cursor.fetchall()
+                if not all_patients:
                     cursor.close()
                     conn.close()
                     await asyncio.sleep(300)
                     continue
-                patient_id = row[0]
+                for (patient_id,) in all_patients:
 
                 # ── Vérifier chaque moment actif du profil ──
                 for moment, heure_fin in fin_intervalle.items():
@@ -453,15 +453,15 @@ async def tache_generation_prises():
             try:
                 cursor = conn.cursor()
 
-                # ── Récupérer le patient et sa prescription active ──
-                cursor.execute("SELECT id FROM patients LIMIT 1;")
-                row = cursor.fetchone()
-                if not row:
+                # ── Multi-patients ──
+                cursor.execute("SELECT id FROM patients ORDER BY id;")
+                all_patients = cursor.fetchall()
+                if not all_patients:
                     cursor.close()
                     conn.close()
                     await asyncio.sleep(1800)
                     continue
-                patient_id = row[0]
+                for (patient_id,) in all_patients:
 
                 # Récupérer la prescription active (la plus récente)
                 cursor.execute("""
