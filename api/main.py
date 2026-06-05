@@ -167,64 +167,64 @@ async def tache_alertes(mqtt_client):
                     continue
                 for (patient_id,) in all_patients:
 
-                # ── Chercher les alertes prévues pour cette minute ──
-                #
-                # On compare heure_alerte (format 'HH:MM:SS' dans la BDD)
-                # avec l'heure actuelle (format 'HH:MM')
-                #
-                # Filtre jour_semaine : le seed génère une alerte par jour×moment,
-                # donc on filtre sur le jour actuel pour ne pas envoyer les alertes
-                # d'un autre jour
-                cursor.execute("""
-                    SELECT DISTINCT moment, heure_alerte
-                    FROM alertes_optimisation
-                    WHERE patient_id = %s
-                      AND jour_semaine = %s
-                      AND TO_CHAR(heure_alerte, 'HH24:MI') = %s
-                    ORDER BY moment;
-                """, (patient_id, jour_semaine, heure_actuelle))
-
-                alertes = cursor.fetchall()
-
-                for alerte in alertes:
-                    moment = alerte[0]  # 'matin', 'midi', ou 'soir'
-
-                    # ── Clé unique pour cette alerte ──
-                    # Empêche d'envoyer la même alerte plusieurs fois
-                    cle = f"{date_courante}_{moment}"
-                    if cle in alertes_envoyees:
-                        continue  # déjà envoyée aujourd'hui
-
-                    # ── Vérifier que la prise est encore en attente ──
-                    # Pas besoin de buzzer si le patient a déjà pris
+                    # ── Chercher les alertes prévues pour cette minute ──
+                    #
+                    # On compare heure_alerte (format 'HH:MM:SS' dans la BDD)
+                    # avec l'heure actuelle (format 'HH:MM')
+                    #
+                    # Filtre jour_semaine : le seed génère une alerte par jour×moment,
+                    # donc on filtre sur le jour actuel pour ne pas envoyer les alertes
+                    # d'un autre jour
                     cursor.execute("""
-                        SELECT statut FROM prises
+                        SELECT DISTINCT moment, heure_alerte
+                        FROM alertes_optimisation
                         WHERE patient_id = %s
-                          AND moment = %s
-                          AND heure_prevue::date = CURRENT_DATE
-                          AND statut = 'en_attente';
-                    """, (patient_id, moment))
+                          AND jour_semaine = %s
+                          AND TO_CHAR(heure_alerte, 'HH24:MI') = %s
+                        ORDER BY moment;
+                    """, (patient_id, jour_semaine, heure_actuelle))
 
-                    prise_en_attente = cursor.fetchone()
+                    alertes = cursor.fetchall()
 
-                    if not prise_en_attente:
-                        # Prise déjà faite ou pas de prise aujourd'hui → pas de buzzer
-                        continue
+                    for alerte in alertes:
+                        moment = alerte[0]  # 'matin', 'midi', ou 'soir'
 
-                    # ── ENVOYER L'ALERTE BUZZER ──
-                    # Publier sur medicinebox/alerte → l'ESP32 reçoit → buzzer 30s
-                    if mqtt_client and mqtt_client.is_connected():
-                        message = json.dumps({
-                            "action": "buzzer_on",
-                            "moment": moment
-                        })
-                        mqtt_client.publish("medicinebox/alerte", message)
-                        alertes_envoyees.add(cle)
-                        print(f"🔔 Alerte envoyée : buzzer_on pour {moment} à {heure_actuelle}")
-                    else:
-                        print(f"⚠️ MQTT non connecté — alerte {moment} non envoyée")
+                        # ── Clé unique pour cette alerte ──
+                        # Empêche d'envoyer la même alerte plusieurs fois
+                        cle = f"{date_courante}_{moment}"
+                        if cle in alertes_envoyees:
+                            continue  # déjà envoyée aujourd'hui
 
-                cursor.close()
+                        # ── Vérifier que la prise est encore en attente ──
+                        # Pas besoin de buzzer si le patient a déjà pris
+                        cursor.execute("""
+                            SELECT statut FROM prises
+                            WHERE patient_id = %s
+                              AND moment = %s
+                              AND heure_prevue::date = CURRENT_DATE
+                              AND statut = 'en_attente';
+                        """, (patient_id, moment))
+
+                        prise_en_attente = cursor.fetchone()
+
+                        if not prise_en_attente:
+                            # Prise déjà faite ou pas de prise aujourd'hui → pas de buzzer
+                            continue
+
+                        # ── ENVOYER L'ALERTE BUZZER ──
+                        # Publier sur medicinebox/alerte → l'ESP32 reçoit → buzzer 30s
+                        if mqtt_client and mqtt_client.is_connected():
+                            message = json.dumps({
+                                "action": "buzzer_on",
+                                "moment": moment
+                            })
+                            mqtt_client.publish("medicinebox/alerte", message)
+                            alertes_envoyees.add(cle)
+                            print(f"🔔 Alerte envoyée : buzzer_on pour {moment} à {heure_actuelle}")
+                        else:
+                            print(f"⚠️ MQTT non connecté — alerte {moment} non envoyée")
+
+                    cursor.close()
             except Exception as e:
                 print(f"❌ Erreur tâche alertes (BDD) : {e}")
             finally:
@@ -335,47 +335,47 @@ async def tache_doses_manquees(mqtt_client):
                     continue
                 for (patient_id,) in all_patients:
 
-                # ── Vérifier chaque moment actif du profil ──
-                for moment, heure_fin in fin_intervalle.items():
+                    # ── Vérifier chaque moment actif du profil ──
+                    for moment, heure_fin in fin_intervalle.items():
 
-                    # Si l'heure actuelle n'a pas encore dépassé la fin de l'intervalle
-                    # → trop tôt pour déclarer une dose manquée
-                    if heure_actuelle < heure_fin:
-                        continue
+                        # Si l'heure actuelle n'a pas encore dépassé la fin de l'intervalle
+                        # → trop tôt pour déclarer une dose manquée
+                        if heure_actuelle < heure_fin:
+                            continue
 
-                    # ── Chercher une prise en_attente pour ce moment aujourd'hui ──
-                    cursor.execute("""
-                        SELECT id FROM prises
-                        WHERE patient_id = %s
-                          AND moment = %s
-                          AND heure_prevue::date = CURRENT_DATE
-                          AND statut = 'en_attente';
-                    """, (patient_id, moment))
-
-                    prise = cursor.fetchone()
-
-                    if prise:
-                        prise_id = prise[0]
-
-                        # ── Marquer la prise comme manquée ──
+                        # ── Chercher une prise en_attente pour ce moment aujourd'hui ──
                         cursor.execute("""
-                            UPDATE prises SET statut = 'manque'
-                            WHERE id = %s;
-                        """, (prise_id,))
+                            SELECT id FROM prises
+                            WHERE patient_id = %s
+                              AND moment = %s
+                              AND heure_prevue::date = CURRENT_DATE
+                              AND statut = 'en_attente';
+                        """, (patient_id, moment))
 
-                        # ── Créer une alerte pour le dashboard du médecin ──
-                        cursor.execute("""
-                            INSERT INTO alertes (patient_id, type, message, created_at, lu)
-                            VALUES (%s, 'dose_manquee', %s, NOW(), FALSE);
-                        """, (
-                            patient_id,
-                            f"Dose {moment} manquee - {maintenant.strftime('%d/%m/%Y')}"
-                        ))
+                        prise = cursor.fetchone()
 
-                        conn.commit()
-                        print(f"⚠️ Dose manquée détectée : {moment} ({maintenant.strftime('%H:%M')})")
+                        if prise:
+                            prise_id = prise[0]
 
-                cursor.close()
+                            # ── Marquer la prise comme manquée ──
+                            cursor.execute("""
+                                UPDATE prises SET statut = 'manque'
+                                WHERE id = %s;
+                            """, (prise_id,))
+
+                            # ── Créer une alerte pour le dashboard du médecin ──
+                            cursor.execute("""
+                                INSERT INTO alertes (patient_id, type, message, created_at, lu)
+                                VALUES (%s, 'dose_manquee', %s, NOW(), FALSE);
+                            """, (
+                                patient_id,
+                                f"Dose {moment} manquee - {maintenant.strftime('%d/%m/%Y')}"
+                            ))
+
+                            conn.commit()
+                            print(f"⚠️ Dose manquée détectée : {moment} ({maintenant.strftime('%H:%M')})")
+
+                    cursor.close()
             except Exception as e:
                 print(f"❌ Erreur tâche doses manquées (BDD) : {e}")
             finally:
@@ -463,60 +463,60 @@ async def tache_generation_prises():
                     continue
                 for (patient_id,) in all_patients:
 
-                # Récupérer la prescription active (la plus récente)
-                cursor.execute("""
-                    SELECT id FROM prescriptions
-                    WHERE patient_id = %s
-                      AND date_debut <= %s
-                      AND date_fin >= %s
-                    ORDER BY id DESC
-                    LIMIT 1;
-                """, (patient_id, aujourd_hui, aujourd_hui))
-
-                row_presc = cursor.fetchone()
-                if not row_presc:
-                    cursor.close()
-                    conn.close()
-                    await asyncio.sleep(1800)
-                    continue
-                prescription_id = row_presc[0]
-
-                # ── Vérifier et créer les prises manquantes ──
-                prises_creees = 0
-
-                for moment, heure_str in moments_config.items():
-                    # Vérifier si la prise existe déjà pour ce moment aujourd'hui
+                    # Récupérer la prescription active (la plus récente)
                     cursor.execute("""
-                        SELECT id FROM prises
+                        SELECT id FROM prescriptions
                         WHERE patient_id = %s
-                          AND moment = %s
-                          AND heure_prevue::date = %s;
-                    """, (patient_id, moment, aujourd_hui))
+                          AND date_debut <= %s
+                          AND date_fin >= %s
+                        ORDER BY id DESC
+                        LIMIT 1;
+                    """, (patient_id, aujourd_hui, aujourd_hui))
 
-                    if cursor.fetchone():
-                        continue  # déjà existante → pas de doublon
+                    row_presc = cursor.fetchone()
+                    if not row_presc:
+                        cursor.close()
+                        conn.close()
+                        await asyncio.sleep(1800)
+                        continue
+                    prescription_id = row_presc[0]
 
-                    # ── Créer la prise en_attente ──
-                    heure_prevue = datetime.combine(
-                        aujourd_hui,
-                        datetime.strptime(heure_str, "%H:%M:%S").time()
-                    )
+                    # ── Vérifier et créer les prises manquantes ──
+                    prises_creees = 0
 
-                    cursor.execute("""
-                        INSERT INTO prises (
-                            patient_id, prescription_id, moment,
-                            heure_prevue, heure_reelle, statut,
-                            poids_avant, poids_apres
-                        ) VALUES (%s, %s, %s, %s, NULL, 'en_attente', NULL, NULL);
-                    """, (patient_id, prescription_id, moment, heure_prevue))
+                    for moment, heure_str in moments_config.items():
+                        # Vérifier si la prise existe déjà pour ce moment aujourd'hui
+                        cursor.execute("""
+                            SELECT id FROM prises
+                            WHERE patient_id = %s
+                              AND moment = %s
+                              AND heure_prevue::date = %s;
+                        """, (patient_id, moment, aujourd_hui))
 
-                    prises_creees += 1
+                        if cursor.fetchone():
+                            continue  # déjà existante → pas de doublon
 
-                if prises_creees > 0:
-                    conn.commit()
-                    print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui} (profil actif)")
+                        # ── Créer la prise en_attente ──
+                        heure_prevue = datetime.combine(
+                            aujourd_hui,
+                            datetime.strptime(heure_str, "%H:%M:%S").time()
+                        )
 
-                cursor.close()
+                        cursor.execute("""
+                            INSERT INTO prises (
+                                patient_id, prescription_id, moment,
+                                heure_prevue, heure_reelle, statut,
+                                poids_avant, poids_apres
+                            ) VALUES (%s, %s, %s, %s, NULL, 'en_attente', NULL, NULL);
+                        """, (patient_id, prescription_id, moment, heure_prevue))
+
+                        prises_creees += 1
+
+                    if prises_creees > 0:
+                        conn.commit()
+                        print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui} (profil actif)")
+
+                    cursor.close()
             except Exception as e:
                 print(f"❌ Erreur tâche génération prises (BDD) : {e}")
             finally:
