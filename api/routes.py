@@ -395,9 +395,10 @@ def changement_rx(body: ChangementRx):
         # ── Désactiver l'ancienne prescription active ──
         # Sans ça, l'ancienne et la nouvelle coexistent
         # → le système génèrerait des prises en double
+        # date_fin = hier pour que la nouvelle (aujourd'hui) ne soit pas bloquée
         cursor.execute("""
             UPDATE prescriptions
-            SET active = FALSE, date_fin = CURRENT_DATE
+            SET active = FALSE, date_fin = CURRENT_DATE - INTERVAL '1 day'
             WHERE patient_id = %s AND active = TRUE;
         """, (patient_id,))
 
@@ -472,9 +473,10 @@ def arreter_traitement():
         patient_id = row[0]
 
         # ── Désactiver la prescription active ──
+        # date_fin = hier pour éviter conflit si nouvelle prescription créée le même jour
         cursor.execute("""
             UPDATE prescriptions
-            SET active = FALSE, date_fin = CURRENT_DATE
+            SET active = FALSE, date_fin = CURRENT_DATE - INTERVAL '1 day'
             WHERE patient_id = %s AND active = TRUE;
         """, (patient_id,))
 
