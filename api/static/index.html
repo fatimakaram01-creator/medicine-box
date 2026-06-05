@@ -333,6 +333,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div id="doses-today"><div class="loading">Chargement...</div></div>
   </div>
   <div id="patient-alerts"></div>
+  <div class="card" id="rx-patient-card">
+    <div class="section-label">Prescription active</div>
+    <div id="rx-patient"><div class="loading">Chargement...</div></div>
+  </div>
 
   <div class="ctrl-card" style="border:1.5px solid var(--teal)">
     <div class="section-label">Système</div>
@@ -399,6 +403,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="section-label">Dernières alertes</div>
     <div id="medecin-alertes"><div class="loading">Chargement...</div></div>
   </div>
+  <div class="card">
+    <div class="section-label">Prescription active</div>
+    <div id="rx-medecin"><div class="loading">Chargement...</div></div>
+  </div>
   <div class="ctrl-card">
     <div class="section-label">Changement de prescription</div>
     <div class="input-wrap">
@@ -412,10 +420,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <input type="text" id="rx-medecin" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
       <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
-    </div>
-    <div style="margin-top:12px;padding-top:12px;border-top:0.5px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Ou arrêter le traitement en cours :</div>
-      <button class="btn" onclick="arreterTraitement()" style="width:100%;color:var(--red-text);border-color:rgba(226,75,74,.3);background:var(--red-bg)">⛔ Arrêter le traitement actuel</button>
     </div>
   </div>
   <div class="ctrl-card">
@@ -584,6 +588,12 @@ async function loadAll() {
     renderContextesSpeciaux(profils);   // → page patient
     renderProfilsHistorique(profils);   // → page médecin
     renderProfilActifMedecin(profils);  // → page médecin lecture seule
+  }
+
+  const rx = await api('/prescription/active');
+  if (rx) {
+    renderPrescriptionPatient(rx);
+    renderPrescriptionMedecin(rx);
   }
 }
 
@@ -818,6 +828,53 @@ async function changerRx() {
   };
   const res = await api('/config/changement-rx', { method: 'POST', body: JSON.stringify(data) });
   if (res) showToast(res.message || res.error);
+}
+
+// ══════════════════════════════════════════════════
+// PRESCRIPTION ACTIVE
+// ══════════════════════════════════════════════════
+function renderPrescriptionPatient(rx) {
+  const div = document.getElementById('rx-patient');
+  if (!div) return;
+  if (!rx.active) {
+    div.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Aucune prescription active</div>';
+    return;
+  }
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:28px">💊</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500">${rx.medicament} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">${rx.dosage}</span></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${rx.nb_prises_jour} prise(s)/jour · ${rx.medecin}</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Du ${rx.date_debut} → ${rx.date_fin}</div>
+      </div>
+      <span class="pill pill-ok"><span class="pill-dot"></span>Active</span>
+    </div>
+  `;
+}
+
+function renderPrescriptionMedecin(rx) {
+  const div = document.getElementById('rx-medecin');
+  if (!div) return;
+  if (!rx.active) {
+    div.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Aucune prescription active — créez-en une ci-dessous</div>';
+    return;
+  }
+  div.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="font-size:28px">💊</div>
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500">${rx.medicament} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">${rx.dosage}</span></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${rx.nb_prises_jour} prise(s)/jour · ${rx.medecin}</div>
+        <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Du ${rx.date_debut} → ${rx.date_fin}</div>
+      </div>
+      <span class="pill pill-ok"><span class="pill-dot"></span>Active</span>
+    </div>
+    <div style="padding-top:10px;border-top:0.5px solid var(--border)">
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Arrêter ce traitement :</div>
+      <button class="btn" onclick="arreterTraitement()" style="width:100%;color:var(--red-text);border-color:rgba(226,75,74,.3);background:var(--red-bg)">⛔ Arrêter le traitement actuel</button>
+    </div>
+  `;
 }
 
 async function arreterTraitement() {

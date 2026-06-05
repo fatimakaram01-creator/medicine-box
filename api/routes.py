@@ -569,7 +569,51 @@ def _get_moments_config():
 # INTERVALLES PROFILS
 # ═══════════════════════════════════════════════════════
 
-@router.get("/intervalles/profils/actif")
+@router.get("/prescription/active")
+def get_prescription_active():
+    """Retourne la prescription active du patient avec les détails"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM patients LIMIT 1;")
+        row = cursor.fetchone()
+        if not row:
+            cursor.close()
+            return {"error": "Aucun patient"}
+        patient_id = row[0]
+        cursor.execute("""
+            SELECT p.id, p.medecin, p.date_debut::text, p.date_fin::text,
+                   m.nom, m.dosage,
+                   COUNT(pd.id) as nb_prises
+            FROM prescriptions p
+            LEFT JOIN prescription_doses pd ON pd.prescription_id = p.id
+            LEFT JOIN medicaments m ON m.id = pd.medicament_id
+            WHERE p.patient_id = %s AND p.active = TRUE
+              AND p.date_fin >= CURRENT_DATE
+            GROUP BY p.id, p.medecin, p.date_debut, p.date_fin, m.nom, m.dosage
+            ORDER BY p.id DESC LIMIT 1;
+        """, (patient_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return {"active": False}
+        return {
+            "active": True,
+            "id": row[0],
+            "medecin": row[1],
+            "date_debut": row[2],
+            "date_fin": row[3],
+            "medicament": row[4] or "—",
+            "dosage": row[5] or "—",
+            "nb_prises_jour": row[6]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+
 def get_profil_actif():
     """Retourne le profil actif uniquement"""
     conn = get_connection()
