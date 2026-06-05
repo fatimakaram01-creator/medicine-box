@@ -324,7 +324,9 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     <div class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:var(--green-dot)"></div>Complet</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--amber-dot)"></div>Incomplet</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--red-dot)"></div>Manqué</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--blue-dot)"></div>Aujourd'hui</div>
+      <div class="legend-item"><div class="legend-dot" style="background:var(--border-md)"></div>Sans prescription</div>
       <div class="legend-item"><div class="legend-dot" style="background:var(--gray-dot)"></div>À venir</div>
     </div>
   </div>
@@ -581,7 +583,10 @@ async function loadAll() {
   if (config) { renderConfig(config); renderMedecinStatus(config); }
 
   const hist = await api('/prises/historique');
-  if (hist) renderHistPrises(hist);
+  if (hist) {
+    renderHistPrises(hist);
+    renderPatientPage(patients, prises, alertes, observance, hist); // re-render avec hist
+  }
 
   const profils = await api('/intervalles/profils');
   if (profils) {
@@ -600,7 +605,7 @@ async function loadAll() {
 // ══════════════════════════════════════════════════
 // PAGE PATIENT — avec 3 métriques : Prises + Observance + Risque d'oubli
 // ══════════════════════════════════════════════════
-function renderPatientPage(patients, prises, alertes, observance) {
+function renderPatientPage(patients, prises, alertes, observance, hist) {
   const now = new Date();
   const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '' };
 
@@ -658,21 +663,60 @@ function renderPatientPage(patients, prises, alertes, observance) {
     }).join('');
   }
 
-  renderCompGrid(prises);
+  renderCompGrid(prises, hist);
 }
 
-function renderCompGrid(prises) {
+function renderCompGrid(prises, hist) {
   const grid = document.getElementById('comp-grid');
   const joursNoms = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
   const now = new Date();
   const todayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
 
+  // Construire un index des prises par jour de la semaine depuis l'historique
+  const prisesParJour = {};
+  if (Array.isArray(hist)) {
+    hist.forEach(pr => {
+      const d = new Date(pr.heure_prevue);
+      // Calculer le jour de la semaine (0=lun ... 6=dim)
+      const idx = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      // Ne garder que les prises de la semaine en cours
+      const debutSemaine = new Date(now);
+      debutSemaine.setDate(now.getDate() - todayIdx);
+      debutSemaine.setHours(0,0,0,0);
+      if (d >= debutSemaine && d <= now) {
+        if (!prisesParJour[idx]) prisesParJour[idx] = { total: 0, pris: 0 };
+        prisesParJour[idx].total++;
+        if (pr.statut === 'pris') prisesParJour[idx].pris++;
+      }
+    });
+  }
+
   grid.innerHTML = joursNoms.map((j, i) => {
     const isToday = i === todayIdx;
     const isPast = i < todayIdx;
     let dot = 'var(--gray-dot)', status = '—';
-    if (isToday && prises) { dot = 'var(--blue-dot)'; status = `${prises.count}/${prises.total}`; }
-    else if (isPast) { dot = 'var(--green-dot)'; status = '3/3'; }
+
+    if (isToday && prises) {
+      dot = 'var(--blue-dot)';
+      status = `${prises.count}/${prises.total}`;
+    } else if (isPast) {
+      const data = prisesParJour[i];
+      if (!data || data.total === 0) {
+        // Pas de prescription ce jour
+        dot = 'var(--border-md)';
+        status = '—';
+      } else if (data.pris === data.total) {
+        dot = 'var(--green-dot)';
+        status = `${data.pris}/${data.total}`;
+      } else if (data.pris > 0) {
+        dot = 'var(--amber-dot)';
+        status = `${data.pris}/${data.total}`;
+      } else {
+        dot = 'var(--red-dot)';
+        status = `0/${data.total}`;
+      }
+    }
+
     return `<div class="comp ${isToday ? 'today' : ''}"><div class="comp-day">${j}</div><div class="comp-dot" style="background:${dot}"></div><div class="comp-status">${status}</div></div>`;
   }).join('');
 }
