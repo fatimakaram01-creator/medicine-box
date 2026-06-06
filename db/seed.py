@@ -186,8 +186,8 @@ def seed_data():
     # Un seul patient pour le prototype
     # ──────────────────────────────────────────────────────
     cursor.execute("""
-        INSERT INTO patients (nom, prenom, medecin)
-        VALUES ('Benmoussa', 'Fatima', 'Dr. Saidi')
+        INSERT INTO patients (nom, prenom, medecin, code_activation)
+        VALUES ('Benmoussa', 'Fatima', 'Dr. Saidi', 'MB-2026-0001')
         RETURNING id;
     """)
     patient_id = cursor.fetchone()[0]
