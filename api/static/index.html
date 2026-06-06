@@ -805,7 +805,15 @@ function renderMLRisque(ml) {
 
 function renderPatientPage(patients, prises, alertes, observance, hist) {
   const now = new Date();
-  const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '' };
+  // Trouver le bon patient selon patientActifId (mode patient) ou patients[0] par défaut
+  let p = { prenom: 'Patient', nom: '' };
+  if (Array.isArray(patients) && patients.length > 0) {
+    if (patientActifId) {
+      p = patients.find(pt => pt.id === patientActifId) || patients[0];
+    } else {
+      p = patients[0];
+    }
+  }
 
   document.getElementById('patient-greeting').textContent = `Bonjour, ${p.prenom}`;
   document.getElementById('patient-date').textContent = formatDate(now);
