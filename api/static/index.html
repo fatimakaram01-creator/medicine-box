@@ -366,6 +366,29 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   </div>
 </div>
 
+<!-- ════════════ PAGE ACTIVATION PATIENT ════════════ -->
+<div id="page-activation" style="display:none;align-items:center;justify-content:center;min-height:calc(100vh - 88px);padding:24px">
+  <div style="text-align:center;max-width:320px;width:100%">
+    <div style="font-size:40px;margin-bottom:12px">🔑</div>
+    <div style="font-size:20px;font-weight:600;color:var(--text-primary);margin-bottom:6px">Entrez votre code</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:28px">Code fourni par votre médecin lors de la configuration de votre boîte</div>
+    <input id="activation-code-input" type="text" placeholder="MB-YYYY-XXXX"
+      style="width:100%;padding:14px;border:1.5px solid var(--border-md);border-radius:var(--radius-lg);font-size:16px;font-family:monospace;letter-spacing:3px;text-align:center;outline:none;background:var(--surface);color:var(--text-primary);margin-bottom:8px"
+      oninput="this.value=this.value.toUpperCase()"
+      onfocus="this.style.borderColor='var(--teal)'"
+      onblur="this.style.borderColor='var(--border-md)'"
+      onkeydown="if(event.key==='Enter') activerPatient()"
+    >
+    <div id="activation-error" style="font-size:12px;color:#E24B4A;margin-bottom:12px;min-height:18px"></div>
+    <button onclick="activerPatient()" style="width:100%;padding:14px;background:var(--teal);color:#fff;border:none;border-radius:var(--radius-lg);font-size:14px;font-weight:500;cursor:pointer;margin-bottom:12px">
+      Accéder à mon dashboard
+    </button>
+    <button onclick="retourAccueil()" style="width:100%;padding:10px;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);font-size:13px;cursor:pointer">
+      ← Retour
+    </button>
+  </div>
+</div>
+
 <!-- ════════════ PAGE PATIENT ════════════ -->
 <div class="page" id="page-patient" style="display:none">
   <div class="page-header">
@@ -640,8 +663,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
+  // Restaurer patient connecté depuis localStorage si présent
+  const savedPid = localStorage.getItem('patient_id');
+  if (savedPid) patientActifId = parseInt(savedPid);
 });
 let selectedPatientId = null;  // patient actuellement sélectionné dans le dashboard médecin
+let patientActifId = null;     // patient connecté en mode patient (via code activation)
 
 const REFRESH_MS = 30000;
 
@@ -687,13 +714,17 @@ async function loadAll() {
   const patientsList = await api('/patients/liste');
   if (patientsList && Array.isArray(patientsList)) {
     renderPatientCards(patientsList);
-    // Sélectionner le premier patient par défaut si aucun sélectionné
+    // Sélectionner le premier patient par défaut si aucun sélectionné (mode médecin)
     if (!selectedPatientId && patientsList.length > 0) {
       selectedPatientId = patientsList[0].id;
     }
   }
 
-  const pid = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
+  // En mode patient → utiliser patientActifId (connecté via code activation)
+  // En mode médecin → utiliser selectedPatientId (sélectionné dans la grille)
+  const pidPatient = patientActifId ? `?patient_id=${patientActifId}` : '';
+  const pidMedecin = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
+  const pid = patientActifId ? pidPatient : pidMedecin;
   const [patients, prises, alertes, observance, config] = await Promise.all([
     api('/patients'),
     api(`/prises/today${pid}`),
@@ -1160,13 +1191,54 @@ let medecinUnlocked = false;
 let pendingTab = null;
 let pendingRole = null;
 
+async function activerPatient() {
+  const code = document.getElementById('activation-code-input').value.trim();
+  const errDiv = document.getElementById('activation-error');
+  const btn = document.querySelector('#page-activation button');
+
+  if (!code) {
+    errDiv.textContent = 'Veuillez entrer votre code d\'activation.';
+    return;
+  }
+  errDiv.textContent = '';
+  btn.textContent = 'Vérification...';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/patients/activer-boite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_activation: code })
+    });
+    const data = await res.json();
+    if (res.ok && data.patient_id) {
+      patientActifId = data.patient_id;
+      localStorage.setItem('patient_id', data.patient_id);
+      localStorage.setItem('patient_code', code);
+      document.getElementById('page-activation').style.display = 'none';
+      _activerRole('patient');
+    } else {
+      errDiv.textContent = 'Code invalide. Vérifiez le code fourni par votre médecin.';
+    }
+  } catch (e) {
+    errDiv.textContent = 'Erreur de connexion. Vérifiez votre connexion internet.';
+  }
+  btn.textContent = 'Accéder à mon dashboard';
+  btn.disabled = false;
+}
+
 function choisirRole(role) {
   if (role === 'medecin') {
     pendingRole = role;
     openPinOverlay();
     return;
   }
-  _activerRole(role);
+  // Mode patient → écran de saisie code d'activation
+  document.getElementById('page-accueil').style.display = 'none';
+  document.getElementById('page-activation').style.display = 'flex';
+  document.getElementById('activation-code-input').value = '';
+  document.getElementById('activation-error').textContent = '';
+  setTimeout(() => document.getElementById('activation-code-input').focus(), 100);
 }
 
 function _activerRole(role) {
@@ -1215,8 +1287,12 @@ function retourPatient() {
 
 function retourAccueil() {
   medecinUnlocked = false;
+  patientActifId = null;
+  localStorage.removeItem('patient_id');
+  localStorage.removeItem('patient_code');
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById('page-accueil').style.display = 'flex';
+  document.getElementById('page-activation').style.display = 'none';
   const indicator = document.getElementById('role-indicator');
   if (indicator) indicator.style.display = 'none';
   // Cacher les boutons nav
