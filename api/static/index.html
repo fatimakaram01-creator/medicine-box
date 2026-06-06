@@ -242,10 +242,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       </div>
     </div>
   </div>
-  <div class="nav-tabs">
-    <div class="nav-tab active" onclick="switchTab('patient',this)">Patient</div>
-    <div class="nav-tab" onclick="switchTab('medecin',this)">Médecin</div>
-    <div class="nav-tab" onclick="switchTab('historique',this)">Historique</div>
+  <!-- Indicateur de rôle actif -->
+  <div id="role-indicator" style="display:none;padding:0 16px;height:36px;display:none;align-items:center;justify-content:space-between;border-top:0.5px solid var(--border)">
+    <div id="role-label" style="font-size:12px;font-weight:500;color:var(--text-secondary)"></div>
+    <button onclick="retourAccueil()" style="background:none;border:none;font-size:11px;color:var(--text-tertiary);cursor:pointer;text-decoration:underline">Changer de rôle</button>
   </div>
 </nav>
 
@@ -327,11 +327,55 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <button style="background:none;border:none;font-size:11px;color:var(--green-text);cursor:pointer;text-decoration:underline" onclick="toggleSystem(false)">Mettre en pause</button>
 </div>
 
+<!-- ════════════ ÉCRAN D'ACCUEIL ════════════ -->
+<div id="page-accueil" style="display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 88px);padding:24px">
+  <div style="text-align:center;max-width:320px;width:100%">
+    <div style="font-size:48px;margin-bottom:12px">💊</div>
+    <div style="font-size:22px;font-weight:600;color:var(--text-primary);margin-bottom:6px">Medicine Box</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-bottom:40px">Smart Medication Tracker</div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <button onclick="choisirRole('patient')" style="
+        width:100%;padding:18px 20px;border-radius:var(--radius-lg);
+        border:1.5px solid var(--border-md);background:var(--surface);
+        cursor:pointer;display:flex;align-items:center;gap:14px;
+        transition:all .15s;text-align:left
+      " onmouseover="this.style.borderColor='var(--teal)'" onmouseout="this.style.borderColor='var(--border-md)'">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--green-bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👤</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--text-primary)">Je suis patient</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Voir mes prises et mon suivi</div>
+        </div>
+      </button>
+
+      <button onclick="choisirRole('medecin')" style="
+        width:100%;padding:18px 20px;border-radius:var(--radius-lg);
+        border:1.5px solid var(--teal);background:rgba(29,158,117,.04);
+        cursor:pointer;display:flex;align-items:center;gap:14px;
+        transition:all .15s;text-align:left
+      ">
+        <div style="width:44px;height:44px;border-radius:50%;background:rgba(29,158,117,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🩺</div>
+        <div>
+          <div style="font-size:14px;font-weight:500;color:var(--teal)">Je suis médecin</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Dashboard et prescriptions</div>
+        </div>
+      </button>
+    </div>
+
+    <div style="margin-top:32px;font-size:11px;color:var(--text-tertiary)">
+      Polytechnique Agadir · 2026
+    </div>
+  </div>
+</div>
+
 <!-- ════════════ PAGE PATIENT ════════════ -->
-<div class="page active" id="page-patient">
+<div class="page" id="page-patient" style="display:none">
   <div class="page-header">
     <div><div class="page-header-title" id="patient-greeting">Chargement...</div><div class="page-header-sub" id="patient-date"></div></div>
-    <div class="header-badges"><div class="status-live"><div class="status-dot"></div><span id="patient-status">Connexion...</span></div></div>
+    <div class="header-badges">
+      <div class="status-live"><div class="status-dot"></div><span id="patient-status">Connexion...</span></div>
+      <button onclick="voirHistorique()" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer">📋 Historique</button>
+    </div>
   </div>
   <div class="metrics" id="patient-metrics"><div class="loading">Chargement des données...</div></div>
   <div class="card">
@@ -518,9 +562,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 
 
 <!-- ════════════ PAGE HISTORIQUE ════════════ -->
-<div class="page" id="page-historique">
+<div class="page" id="page-historique" style="display:none">
   <div class="page-header">
     <div><div class="page-header-title">Historique</div><div class="page-header-sub">Toutes les prises et événements</div></div>
+    <button onclick="retourPatient()" style="background:none;border:0.5px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text-secondary);cursor:pointer">← Retour</button>
   </div>
   <div class="sub-tabs">
     <div class="sub-tab active" onclick="switchSubTab('prises',this)">Prises</div>
@@ -1082,21 +1127,78 @@ async function arreterTraitement() {
 // ══════════════════════════════════════════════════
 let medecinUnlocked = false;
 let pendingTab = null;
+let pendingRole = null;
 
-function switchTab(page, el) {
-  if (page === 'medecin' && !medecinUnlocked) {
-    pendingTab = { page, el };
+function choisirRole(role) {
+  if (role === 'medecin') {
+    pendingRole = role;
     openPinOverlay();
     return;
   }
-  _doSwitchTab(page, el);
+  _activerRole(role);
+}
+
+function _activerRole(role) {
+  // Cacher accueil
+  document.getElementById('page-accueil').style.display = 'none';
+
+  // Cacher toutes les pages
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+
+  // Afficher la bonne page
+  if (role === 'patient') {
+    document.getElementById('page-patient').style.display = 'block';
+    document.getElementById('page-historique').style.display = 'none';
+    // Afficher sous-onglets patient
+    const patientNav = document.getElementById('patient-subnav');
+    if (patientNav) patientNav.style.display = 'flex';
+  } else if (role === 'medecin') {
+    document.getElementById('page-medecin').style.display = 'block';
+  }
+
+  // Mettre à jour l'indicateur de rôle
+  const indicator = document.getElementById('role-indicator');
+  const label = document.getElementById('role-label');
+  if (indicator && label) {
+    indicator.style.display = 'flex';
+    label.textContent = role === 'patient' ? '👤 Mode Patient' : '🩺 Mode Médecin';
+  }
+
+  closeNotif();
+  loadAll();
+}
+
+function voirHistorique() {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-historique').style.display = 'block';
+}
+
+function retourPatient() {
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-patient').style.display = 'block';
+}
+
+function retourAccueil() {
+  medecinUnlocked = false;
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-accueil').style.display = 'flex';
+  const indicator = document.getElementById('role-indicator');
+  if (indicator) indicator.style.display = 'none';
+}
+
+// Garder switchTab pour compatibilité
+function switchTab(page, el) {
+  if (page === 'historique') {
+    document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+    document.getElementById('page-historique').style.display = 'block';
+    closeNotif();
+    return;
+  }
 }
 
 function _doSwitchTab(page, el) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('page-' + page).classList.add('active');
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-' + page).style.display = 'block';
   closeNotif();
 }
 
@@ -1536,8 +1638,8 @@ async function activerProfil(id) {
   }
 }
 
-loadAll();
-setInterval(loadAll, REFRESH_MS);
+// loadAll() sera appelé après choix du rôle
+setInterval(() => { if (document.getElementById("page-patient").style.display !== "none" || document.getElementById("page-medecin").style.display !== "none") loadAll(); }, REFRESH_MS);
 </script>
 </body>
 </html>
