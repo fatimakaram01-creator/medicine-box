@@ -32,7 +32,8 @@ const int   MQTT_PORT   = 8883;
 const char* MQTT_USER   = "medicinebox";
 const char* MQTT_PASS   = "MedBox2026!";
 
-#define TOPIC_ALERTE   "medicinebox/alerte"
+// TOPIC_ALERTE est dynamique (dépend du PATIENT_ID) — mis à jour dans connecterMQTT()
+String TOPIC_ALERTE    = "medicinebox/alerte/0";
 #define TOPIC_PRISE    "medicinebox/prise"
 #define TOPIC_STATUT   "medicinebox/statut"
 #define TOPIC_CONFIG   "medicinebox/config"
@@ -487,9 +488,11 @@ bool connecterMQTT() {
   espClient.setInsecure();
   mqtt.setServer(MQTT_BROKER, MQTT_PORT);
   mqtt.setCallback(mqttCallback);
+  // Construire le topic alerte spécifique à ce patient
+  TOPIC_ALERTE = "medicinebox/alerte/" + String(PATIENT_ID);
   if (mqtt.connect("medicinebox-esp32", MQTT_USER, MQTT_PASS,
                     TOPIC_STATUT, 1, true, "{\"status\":\"offline\"}")) {
-    mqtt.subscribe(TOPIC_ALERTE);
+    mqtt.subscribe(TOPIC_ALERTE.c_str());
     mqtt.subscribe(TOPIC_CONFIG);
     mqtt.subscribe(TOPIC_COMMANDE);
     mqttConnecte = true;

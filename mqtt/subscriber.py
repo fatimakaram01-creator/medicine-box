@@ -223,13 +223,18 @@ def handle_statut(data):
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM patients ORDER BY id LIMIT 1;")
-            row = cursor.fetchone()
-            if row:
+            # Utiliser patient_id du message si présent, sinon premier patient
+            if "patient_id" in data:
+                patient_id = int(data["patient_id"])
+            else:
+                cursor.execute("SELECT id FROM patients ORDER BY id LIMIT 1;")
+                row = cursor.fetchone()
+                patient_id = row[0] if row else None
+            if patient_id:
                 cursor.execute("""
                     INSERT INTO alertes (patient_id, type, message, created_at, lu)
                     VALUES (%s, 'erreur_dispositif', %s, NOW(), FALSE);
-                """, (row[0], data.get("message", "Erreur ESP32")))
+                """, (patient_id, data.get("message", "Erreur ESP32")))
                 conn.commit()
             cursor.close()
             print(f"🚨 Alerte : {data.get('message')}")
