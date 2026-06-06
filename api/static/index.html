@@ -762,7 +762,7 @@ async function loadAll() {
   const rxHistMed = await api(`/prescriptions/historique${pid}`);
   renderHistMedecin(histMed, alertesMed, rxHistMed);
 
-  const rx = await api('/prescription/active');
+  const rx = await api(`/prescription/active${pid}`);
   if (rx) {
     renderPrescriptionPatient(rx);
     renderPrescriptionMedecin(rx);
