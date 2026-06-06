@@ -247,7 +247,7 @@ def get_patients():
 
 
 @router.get("/prises/today")
-def get_prises_today(patient_id: int = None)):
+def get_prises_today(patient_id: int = None):
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -275,7 +275,7 @@ def get_prises_today(patient_id: int = None)):
 
 
 @router.get("/alertes")
-def get_alertes(patient_id: int = None)):
+def get_alertes(patient_id: int = None):
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -297,7 +297,7 @@ def get_alertes(patient_id: int = None)):
 
 
 @router.get("/observance")
-def get_observance(patient_id: int = None)):
+def get_observance(patient_id: int = None):
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -333,7 +333,7 @@ def get_observance(patient_id: int = None)):
 
 
 @router.get("/prises/historique")
-def get_prises_historique(patient_id: int = None)):
+def get_prises_historique(patient_id: int = None):
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -357,7 +357,7 @@ def get_prises_historique(patient_id: int = None)):
 
 
 @router.get("/config/status")
-def get_config_status(patient_id: int = None)):
+def get_config_status(patient_id: int = None):
     return config_state
 
 
@@ -590,7 +590,7 @@ def changement_rx(body: ChangementRx, patient_id: int = None):
 
 
 @router.post("/config/arreter-traitement")
-def arreter_traitement(, patient_id: int = None):
+def arreter_traitement(patient_id: int = None):
     """
     Arrête la prescription active du patient.
     - Met date_fin = aujourd'hui sur la prescription active
@@ -705,7 +705,7 @@ def _get_moments_config():
 # ═══════════════════════════════════════════════════════
 
 @router.get("/prescription/active")
-def get_prescription_active(patient_id: int = None)):
+def get_prescription_active(patient_id: int = None):
     """Retourne la prescription active du patient avec les détails"""
     conn = get_connection()
     try:
@@ -775,7 +775,7 @@ def get_profil_actif():
 
 
 @router.get("/prescriptions/historique")
-def get_prescriptions_historique(patient_id: int = None)):
+def get_prescriptions_historique(patient_id: int = None):
     """Retourne toutes les prescriptions du patient avec durée d'activation"""
     conn = get_connection()
     try:
@@ -945,7 +945,7 @@ def activer_profil(profil_id: int):
 # ML — PREDICT
 # ══════════════════════════════════════════════════
 @router.get("/ml/predict")
-def ml_predict(patient_id: int = None)):
+def ml_predict(patient_id: int = None):
     """Retourne le risque d'oubli et l'heure optimale d'alerte via ML"""
     try:
         import sys, os
