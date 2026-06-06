@@ -229,7 +229,7 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 <nav>
   <div class="nav-top">
     <div class="nav-brand"><div class="nav-dot" id="status-dot"></div>Medicine Box</div>
-    <div class="nav-right">
+    <div class="nav-right" id="nav-right-buttons" style="display:none">
       <div class="icon-btn" id="notif-btn" onclick="toggleNotif()" title="Notifications">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5a4.5 4.5 0 00-4.5 4.5v2.25L2 9.5v.5h12v-.5l-1.5-1.25V6A4.5 4.5 0 008 1.5zm0 13a2 2 0 002-2H6a2 2 0 002 2z" fill="currentColor"/></svg>
         <div class="badge" id="notif-badge">0</div>
@@ -1173,6 +1173,10 @@ function _activerRole(role) {
   // Cacher accueil
   document.getElementById('page-accueil').style.display = 'none';
 
+  // Afficher les boutons nav
+  const navRight = document.getElementById('nav-right-buttons');
+  if (navRight) navRight.style.display = 'flex';
+
   // Cacher toutes les pages
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
 
@@ -1215,6 +1219,12 @@ function retourAccueil() {
   document.getElementById('page-accueil').style.display = 'flex';
   const indicator = document.getElementById('role-indicator');
   if (indicator) indicator.style.display = 'none';
+  // Cacher les boutons nav
+  const navRight = document.getElementById('nav-right-buttons');
+  if (navRight) navRight.style.display = 'none';
+  // Dot gris sur accueil
+  const dot = document.getElementById('status-dot');
+  if (dot) { dot.style.background = 'var(--gray-dot)'; dot.style.animation = 'none'; }
   // Cacher les banners wifi sur l'écran d'accueil
   ['wifi-banner','connected-banner','system-banner','system-on-banner'].forEach(id => {
     const el = document.getElementById(id);
@@ -1338,13 +1348,65 @@ document.addEventListener('click', function(e) {
 
 function renderNotifications(alertes) {
   if (!Array.isArray(alertes)) return;
-  const unread = alertes.filter(a => !a.lu);
-  document.getElementById('notif-badge').textContent = unread.length;
+
+  const isPatient = document.getElementById('page-patient').style.display !== 'none';
+  const isMedecin = document.getElementById('page-medecin').style.display !== 'none';
+
+  // Filtrer selon le rôle
+  let notifsFiltrees = alertes;
+  let titre = '';
+
+  if (isPatient) {
+    // Patient → uniquement ses doses manquées et alertes système
+    notifsFiltrees = alertes.filter(a =>
+      a.type === 'dose_manquee' || a.type === 'systeme' || a.type === 'erreur_dispositif'
+    );
+    titre = '🔔 Mes alertes';
+  } else if (isMedecin) {
+    // Médecin → toutes les alertes de tous ses patients
+    notifsFiltrees = alertes;
+    titre = '🩺 Alertes patients';
+  }
+
+  const unread = notifsFiltrees.filter(a => !a.lu);
+  document.getElementById('notif-badge').textContent = unread.length > 0 ? unread.length : '0';
   document.getElementById('notif-count-pill').textContent = unread.length + ' nouvelles';
-  document.getElementById('notif-list').innerHTML = alertes.slice(0, 5).map(a => {
+
+  // Titre contextuel
+  const titleEl = document.querySelector('.notif-header-title');
+  if (titleEl) titleEl.textContent = titre || 'Notifications';
+
+  document.getElementById('notif-list').innerHTML = notifsFiltrees.slice(0, 8).map(a => {
     const cls = a.lu ? '' : ' unread';
-    return `<div class="notif-item${cls}"><div class="notif-item-title">${a.type.replace('_', ' ')}</div><div class="notif-item-body">${a.message}</div><div class="notif-item-time">${formatHeure(a.created_at)}</div></div>`;
+    const icon = a.type === 'dose_manquee' ? '💊' : a.type === 'erreur_dispositif' ? '⚠️' : '📋';
+    return `<div class="notif-item${cls}">
+      <div class="notif-item-title">${icon} ${a.type.replace(/_/g, ' ')}</div>
+      <div class="notif-item-body">${a.message}</div>
+      <div class="notif-item-time">${formatHeure(a.created_at)}</div>
+    </div>`;
   }).join('') || '<div class="notif-item"><div class="notif-item-body">Aucune notification</div></div>';
+}
+
+function updateNavDot(config) {
+  const dot = document.getElementById('status-dot');
+  if (!dot) return;
+  const isPatient = document.getElementById('page-patient').style.display !== 'none';
+  const isMedecin = document.getElementById('page-medecin').style.display !== 'none';
+  if (!isPatient && !isMedecin) {
+    // Accueil → dot statique gris
+    dot.style.background = 'var(--gray-dot)';
+    dot.style.animation = 'none';
+    return;
+  }
+  if (config && config.esp32_connected) {
+    dot.style.background = 'var(--teal)';
+    dot.style.animation = 'pulse-dot 1.8s ease-in-out infinite';
+    dot.title = isPatient ? 'Boîte connectée' : 'ESP32 connecté';
+  } else {
+    dot.style.background = 'var(--red-dot)';
+    dot.style.animation = 'none';
+    dot.title = 'Boîte déconnectée';
+  }
 }
 
 function openSettings() { document.getElementById('settings-modal').classList.add('open'); closeNotif(); }
@@ -1388,6 +1450,8 @@ function renderBanners(config) {
     const connBanner = document.getElementById('connected-banner');
     if (connBanner) connBanner.style.display = isPatientVisible ? 'block' : 'none';
   }
+
+  updateNavDot(config);
 
   if (config.esp32_connected && config.system_on) {
     systemBanner.style.display = 'none';
