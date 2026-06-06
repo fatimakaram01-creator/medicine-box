@@ -24,6 +24,7 @@ from fastapi import FastAPI
 from mqtt.subscriber import start_mqtt
 from db.database import get_connection
 from api.routes import config_state, creer_alerte_systeme, _get_moments_config
+from ml.train import train as ml_train
 
 
 # ─────────────────────────────────────────────────────────────
@@ -561,6 +562,50 @@ def mettre_a_jour_heartbeat():
     config_state["esp32_connected"] = True
 
 
+def _patients_prets_pour_ml():
+    """Retourne les patient_id ayant >= 7 jours calendaires de prises réelles."""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT patient_id, COUNT(DISTINCT DATE(heure_prevue)) AS nb_jours
+            FROM prises
+            WHERE statut IN ('pris', 'manque')
+            GROUP BY patient_id
+            HAVING COUNT(DISTINCT DATE(heure_prevue)) >= 7;
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        return [r[0] for r in rows]
+    finally:
+        conn.close()
+
+
+async def tache_ml_nuit():
+    """
+    Ré-entraîne les modèles ML chaque nuit à 00h05.
+    N'entraîne que les patients ayant >= 7 jours de prises réelles dans la base.
+    """
+    now = datetime.now()
+    demain_minuit = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
+    attente = (demain_minuit - now).total_seconds()
+    print(f"⏰ Tâche ML nuit démarrée — prochain entraînement dans {attente/3600:.1f}h (00h05)")
+    await asyncio.sleep(attente)
+    while True:
+        try:
+            print(f"[ML] 🤖 Vérification données — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+            patients_prets = _patients_prets_pour_ml()
+            if not patients_prets:
+                print("[ML] ⏳ Aucun patient avec >= 7 jours de données — entraînement reporté")
+            else:
+                print(f"[ML] ✅ {len(patients_prets)} patient(s) prêt(s) : {patients_prets}")
+                ml_train()
+                print("[ML] ✅ Entraînement terminé")
+        except Exception as e:
+            print(f"[ML] ❌ Erreur : {e}")
+        await asyncio.sleep(24 * 3600)
+
+
 async def tache_heartbeat():
     """
     Vérifie toutes les 10 secondes si l'ESP32 a envoyé un heartbeat.
@@ -635,12 +680,14 @@ async def lifespan(app: FastAPI):
     tache2 = asyncio.create_task(tache_doses_manquees(mqtt_client))
     tache3 = asyncio.create_task(tache_generation_prises())
     tache4 = asyncio.create_task(tache_heartbeat())
+    tache5 = asyncio.create_task(tache_ml_nuit())
 
     print("🟢 Medicine Box API prête")
     print("   ⏰ Tâche alertes buzzer      : active (toutes les 60s)")
     print("   ⏰ Tâche doses manquées      : active (toutes les 5 min)")
     print("   ⏰ Tâche génération prises   : active (toutes les 30 min)")
     print("   ⏰ Tâche heartbeat ESP32     : active (toutes les 10 min)")
+    print("   ⏰ Tâche ML nuit            : active (chaque nuit à 00h05)")
 
     yield
 
@@ -649,6 +696,7 @@ async def lifespan(app: FastAPI):
     tache2.cancel()
     tache3.cancel()
     tache4.cancel()
+    tache5.cancel()
 
     # ── Arrêt : déconnecte MQTT proprement ──
     if mqtt_client:
