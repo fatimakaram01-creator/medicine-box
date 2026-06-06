@@ -362,9 +362,7 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       </button>
     </div>
 
-    <div style="margin-top:32px;font-size:11px;color:var(--text-tertiary)">
-      Polytechnique Agadir · 2026
-    </div>
+
   </div>
 </div>
 
@@ -616,6 +614,14 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 
 <script>
 const API = 'https://medicine-box-zk7r.onrender.com';
+
+// Cacher les banners au démarrage (avant choix du rôle)
+document.addEventListener('DOMContentLoaded', () => {
+  ['wifi-banner','connected-banner','system-banner','system-on-banner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+});
 let selectedPatientId = null;  // patient actuellement sélectionné dans le dashboard médecin
 
 const REFRESH_MS = 30000;
@@ -1184,6 +1190,11 @@ function retourAccueil() {
   document.getElementById('page-accueil').style.display = 'flex';
   const indicator = document.getElementById('role-indicator');
   if (indicator) indicator.style.display = 'none';
+  // Cacher les banners wifi sur l'écran d'accueil
+  ['wifi-banner','connected-banner','system-banner','system-on-banner'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
 }
 
 // Garder switchTab pour compatibilité
@@ -1261,28 +1272,31 @@ function renderBanners(config) {
   const systemBanner = document.getElementById('system-banner');
   const systemOnBanner = document.getElementById('system-on-banner');
 
+  // Le banner wifi est UNIQUEMENT pour la page patient
+  const isPatientVisible = document.getElementById('page-patient').style.display !== 'none';
+
   if (!config) {
-    wifiBanner.style.display = 'block';
+    wifiBanner.style.display = isPatientVisible ? 'block' : 'none';
     systemBanner.style.display = 'none';
     systemOnBanner.style.display = 'none';
     return;
   }
 
   if (!config.esp32_connected) {
-    wifiBanner.style.display = 'block';
+    wifiBanner.style.display = isPatientVisible ? 'block' : 'none';
     const connBanner2 = document.getElementById('connected-banner');
     if (connBanner2) connBanner2.style.display = 'none';
   } else {
     wifiBanner.style.display = 'none';
     const connBanner = document.getElementById('connected-banner');
-    if (connBanner) connBanner.style.display = 'block';
+    if (connBanner) connBanner.style.display = isPatientVisible ? 'block' : 'none';
   }
 
   if (config.esp32_connected && config.system_on) {
     systemBanner.style.display = 'none';
-    systemOnBanner.style.display = 'flex';
+    systemOnBanner.style.display = isPatientVisible ? 'flex' : 'none';
   } else if (config.esp32_connected && !config.system_on) {
-    systemBanner.style.display = 'flex';
+    systemBanner.style.display = isPatientVisible ? 'flex' : 'none';
     systemOnBanner.style.display = 'none';
   } else {
     systemBanner.style.display = 'none';
@@ -1469,7 +1483,10 @@ function pinKey(k) {
       if (pinBuffer === PIN_CODE) {
         medecinUnlocked = true;
         document.getElementById('pin-overlay').classList.remove('open');
-        if (pendingTab) {
+        if (pendingRole) {
+          _activerRole(pendingRole);
+          pendingRole = null;
+        } else if (pendingTab) {
           _doSwitchTab(pendingTab.page, pendingTab.el);
           pendingTab = null;
         }
