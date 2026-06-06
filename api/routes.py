@@ -951,7 +951,7 @@ def ml_predict(patient_id: int = None):
         import sys, os
         sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         from ml.predict import predict, models_exist
-        if not models_exist():
+        if not models_exist(patient_id):
             return {
                 "risque_oubli": None,
                 "niveau_risque": "—",
@@ -959,7 +959,7 @@ def ml_predict(patient_id: int = None):
                 "anomalie": False,
                 "error": "Modèles non entraînés"
             }
-        result = predict()
+        result = predict(patient_id)
         return result
     except Exception as e:
         return {
