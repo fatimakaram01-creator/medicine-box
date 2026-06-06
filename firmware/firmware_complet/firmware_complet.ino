@@ -20,6 +20,11 @@
 #include <ArduinoJson.h>
 #include <SPIFFS.h>
 #include <time.h>
+#include <HTTPClient.h>
+
+// ======================= MQTT HiveMQ Cloud =======================
+// ======================= Backend API =======================
+const char* BACKEND_URL = "https://medicine-box-zk7r.onrender.com";
 
 // ======================= MQTT HiveMQ Cloud =======================
 const char* MQTT_BROKER = "a46cf5176dea4d39974b641766e0a18c.s1.eu.hivemq.cloud";
@@ -40,6 +45,7 @@ const char* AP_PASS = "medbox123";
 // ======================= Objets globaux =======================
 WebServer server(80);
 Preferences prefs;
+int PATIENT_ID = 1;  // Chargé depuis Preferences au démarrage
 WiFiClientSecure espClient;
 PubSubClient mqtt(espClient);
 
@@ -349,7 +355,7 @@ void sauvegarderPriseLocale(const char* moment, long pAvant, long pApres) {
   if (getLocalTime(&ti))
     snprintf(dateStr,sizeof(dateStr),"%04d-%02d-%02d",ti.tm_year+1900,ti.tm_mon+1,ti.tm_mday);
   StaticJsonDocument<200> doc;
-  doc["patient_id"]=1; doc["moment"]=moment;
+  doc["patient_id"]=PATIENT_ID; doc["moment"]=moment;
   doc["poids_avant"]=pAvant; doc["poids_apres"]=pApres; doc["date"]=dateStr;
   char ligne[200]; serializeJson(doc,ligne);
   File f = SPIFFS.open(BUFFER_FILE, FILE_APPEND);
@@ -394,7 +400,7 @@ void publierPrise(long pAvant, long pApres) {
   }
   if (mqtt.connected()) {
     StaticJsonDocument<200> doc;
-    doc["patient_id"]=1; doc["moment"]=moment;
+    doc["patient_id"]=PATIENT_ID; doc["moment"]=moment;
     doc["poids_avant"]=pAvant; doc["poids_apres"]=pApres;
     char buf[200]; serializeJson(doc,buf);
     mqtt.publish(TOPIC_PRISE, buf);
@@ -522,6 +528,58 @@ void syncNTP() {
 // =====================================================
 // WIFI
 // =====================================================
+// =====================================================
+// GESTION PATIENT ID
+// =====================================================
+int chargerPatientId() {
+  prefs.begin("patient", true);
+  int pid = prefs.getInt("id", 0);
+  prefs.end();
+  return pid;
+}
+
+void sauverPatientId(int pid) {
+  prefs.begin("patient", false);
+  prefs.putInt("id", pid);
+  prefs.end();
+  PATIENT_ID = pid;
+  Serial.println("Patient ID sauvegardé : " + String(pid));
+}
+
+void effacerPatientId() {
+  prefs.begin("patient", false);
+  prefs.clear();
+  prefs.end();
+  PATIENT_ID = 0;
+}
+
+// Appelle le backend avec le code d'activation
+// Retourne le patient_id ou 0 si erreur
+int activerBoite(String code) {
+  if (WiFi.status() != WL_CONNECTED) return 0;
+  HTTPClient http;
+  String url = String(BACKEND_URL) + "/patients/activer-boite";
+  http.begin(url);
+  http.addHeader("Content-Type", "application/json");
+  String body = "{\"code_activation\":\"" + code + "\"}";
+  int httpCode = http.POST(body);
+  if (httpCode == 200) {
+    String response = http.getString();
+    // Parser le JSON : {"success":true,"patient_id":7,...}
+    int idx = response.indexOf("\"patient_id\":");
+    if (idx >= 0) {
+      int start = idx + 14;
+      int end = response.indexOf(",", start);
+      if (end < 0) end = response.indexOf("}", start);
+      String pidStr = response.substring(start, end);
+      http.end();
+      return pidStr.toInt();
+    }
+  }
+  http.end();
+  return 0;
+}
+
 bool chargerWiFi(String &ssid, String &pass) {
   prefs.begin("wifi",true);
   ssid=prefs.getString("ssid",""); pass=prefs.getString("pass","");
@@ -566,7 +624,8 @@ button{width:100%;padding:12px;background:#1D9E75;color:#fff;border:none;border-
 <form action="/save" method="POST">
 <label>SSID</label><input type="text" name="ssid" id="ssid" required>
 <label>Mot de passe</label><input type="password" name="pass" id="pass" required>
-<button type="submit">Connecter</button></form></div>
+<label>Code d activation (ex: MB-2026-0047)</label><input type="text" name="code" id="code" placeholder="MB-YYYY-XXXX" style="font-family:monospace;letter-spacing:2px" required>
+<button type="submit">Connecter et activer</button></form></div>
 <script>fetch('/scan').then(r=>r.json()).then(nets=>{
 const d=document.getElementById('nets');
 d.innerHTML=nets.map(n=>'<div class="net" onclick="document.getElementById(\'ssid\').value=\''+n.ssid+'\'">'+n.ssid+' ('+n.rssi+' dBm)</div>').join('');
@@ -601,16 +660,43 @@ void lancerModeAP() {
     server.send(200,"application/json",json);
   });
   server.on("/save", HTTP_POST, [](){
-    String ssid=server.arg("ssid"), pass=server.arg("pass");
-    if(ssid.length()>0){
-      sauverWiFi(ssid,pass);
-      server.send_P(200,"text/html",PAGE_OK);
-      delay(2000); ESP.restart();
-    } else server.send(400,"text/plain","SSID manquant");
+    String ssid=server.arg("ssid");
+    String pass=server.arg("pass");
+    String code=server.arg("code");
+    if(ssid.length()>0 && code.length()>0){
+      // 1. Connexion WiFi temporaire pour vérifier le code
+      sauverWiFi(ssid, pass);
+      if(connecterWiFi(ssid, pass)){
+        // 2. Activer la boîte avec le code
+        int pid = activerBoite(code);
+        if(pid > 0){
+          sauverPatientId(pid);
+          server.send_P(200,"text/html",PAGE_OK);
+          delay(2000);
+          ESP.restart();
+        } else {
+          // Code invalide
+          effacerWiFi();
+          server.send(400,"text/plain","Code invalide. Verifiez le code donne par le medecin.");
+        }
+      } else {
+        effacerWiFi();
+        server.send(400,"text/plain","WiFi incorrect. Verifiez SSID et mot de passe.");
+      }
+    } else {
+      server.send(400,"text/plain","SSID et code obligatoires");
+    }
   });
   server.on("/reset", HTTP_GET, [](){
     effacerWiFi();
+    effacerPatientId();
     server.send(200,"text/plain","Efface. Redemarrage...");
+    delay(1000); ESP.restart();
+  });
+  server.on("/reset-patient", HTTP_GET, [](){
+    effacerPatientId();
+    effacerWiFi();
+    server.send(200,"text/plain","Patient et WiFi effacés. Redemarrage...");
     delay(1000); ESP.restart();
   });
   server.begin();
@@ -652,6 +738,15 @@ void setup() {
   // SPIFFS
   initSPIFFS();
   delay(800);
+
+  // Charger patient_id
+  int pid = chargerPatientId();
+  if (pid > 0) {
+    PATIENT_ID = pid;
+    Serial.println("Patient ID chargé : " + String(PATIENT_ID));
+  } else {
+    Serial.println("⚠️ Pas de patient configuré — mode setup requis");
+  }
 
   // Homing
   faireHoming();
