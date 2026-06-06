@@ -35,7 +35,7 @@ def models_exist(patient_id=None):
         return all(os.path.exists(os.path.join(MODELS_BASE_DIR, f)) for f in required)
 
     models_dir = get_models_dir(patient_id)
-    required = ["isolation_forest.joblib", "rf_classifier.joblib", "rf_regressor.joblib", "metadata.json"]
+    required = ["isolation_forest.joblib", "rf_classifier.joblib", "rf_regressor.joblib", "le_moment.joblib", "le_phase.joblib", "metadata.json"]
     return all(os.path.exists(os.path.join(models_dir, f)) for f in required)
 
 
