@@ -556,6 +556,25 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <div id="profils-historique"><div class="loading">Chargement...</div></div>
     </div>
   </div>
+
+  <!-- Historique du patient sélectionné -->
+  <div class="card" style="margin-top:4px">
+    <div class="section-label">Historique du patient</div>
+    <div class="sub-tabs">
+      <div class="sub-tab active" onclick="switchSubTabMed('med-prises',this)">Prises</div>
+      <div class="sub-tab" onclick="switchSubTabMed('med-alertes',this)">Alertes</div>
+      <div class="sub-tab" onclick="switchSubTabMed('med-prescriptions',this)">Prescriptions</div>
+    </div>
+    <div class="sub-page active" id="sub-med-prises">
+      <div id="med-hist-prises"><div class="loading">Chargement...</div></div>
+    </div>
+    <div class="sub-page" id="sub-med-alertes">
+      <div id="med-hist-alertes"><div class="loading">Chargement...</div></div>
+    </div>
+    <div class="sub-page" id="sub-med-prescriptions">
+      <div id="med-hist-prescriptions"><div class="loading">Chargement...</div></div>
+    </div>
+  </div>
 </div>
 
 
@@ -703,8 +722,14 @@ async function loadAll() {
     renderProfilActifMedecin(profils);  // → page médecin lecture seule
   }
 
-  const rxHist = await api('/prescriptions/historique');
+  const rxHist = await api(`/prescriptions/historique${pid}`);
   if (rxHist) renderHistPrescriptions(rxHist);
+
+  // Historique dans l'interface médecin (filtré par patient sélectionné)
+  const histMed = await api(`/prises/historique${pid}`);
+  const alertesMed = await api(`/alertes${pid}`);
+  const rxHistMed = await api(`/prescriptions/historique${pid}`);
+  renderHistMedecin(histMed, alertesMed, rxHistMed);
 
   const rx = await api('/prescription/active');
   if (rx) {
@@ -1211,6 +1236,78 @@ function _doSwitchTab(page, el) {
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById('page-' + page).style.display = 'block';
   closeNotif();
+}
+
+function switchSubTabMed(id, el) {
+  document.querySelectorAll('#page-medecin .sub-tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('#page-medecin .sub-page').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('sub-' + id).classList.add('active');
+}
+
+function renderHistMedecin(hist, alertes, prescriptions) {
+  // Prises
+  const divP = document.getElementById('med-hist-prises');
+  if (divP) {
+    if (!Array.isArray(hist) || !hist.length) {
+      divP.innerHTML = '<div class="loading">Aucune prise enregistrée</div>';
+    } else {
+      divP.innerHTML = hist.slice(0,20).map(pr => `
+        <div class="tl-row">
+          <div class="tl-dot" style="background:${dotForStatut(pr.statut)}"></div>
+          <div class="tl-info">
+            <div class="tl-name">${pr.moment.charAt(0).toUpperCase()+pr.moment.slice(1)}</div>
+            <div class="tl-sub">${pr.statut==='pris'&&pr.poids_avant?`${pr.poids_avant}g → ${pr.poids_apres}g`:pr.statut==='manque'?'Aucune prise':'En attente'}</div>
+          </div>
+          <div class="tl-right">
+            <div class="tl-time">${formatHeure(pr.heure_reelle||pr.heure_prevue)}</div>
+            ${pillForStatut(pr.statut)}
+          </div>
+        </div>`).join('');
+    }
+  }
+
+  // Alertes
+  const divA = document.getElementById('med-hist-alertes');
+  if (divA) {
+    if (!Array.isArray(alertes) || !alertes.length) {
+      divA.innerHTML = '<div class="loading">Aucune alerte</div>';
+    } else {
+      divA.innerHTML = alertes.map(a => {
+        const pillCls = a.type==='dose_manquee'?'pill-warn':a.type==='erreur_dispositif'?'pill-danger':'pill-info';
+        return `<div class="hist-row"><div class="hist-time">${formatHeure(a.created_at)}</div><div class="hist-desc">${a.message}</div><span class="pill ${pillCls}">${a.type.replace('_',' ')}</span></div>`;
+      }).join('');
+    }
+  }
+
+  // Prescriptions
+  const divRx = document.getElementById('med-hist-prescriptions');
+  if (divRx && Array.isArray(prescriptions) && prescriptions.length) {
+    const aujourd_hui = new Date(); aujourd_hui.setHours(0,0,0,0);
+    divRx.innerHTML = prescriptions.map(p => {
+      const dateFin = new Date(p.date_fin); dateFin.setHours(0,0,0,0);
+      const isActive = p.active && dateFin >= aujourd_hui;
+      const isArretee = !p.active;
+      const duree = Math.round((dateFin - new Date(p.date_debut)) / (1000*60*60*24));
+      const pillHtml = isActive
+        ? '<span class="pill pill-ok"><span class="pill-dot"></span>Active</span>'
+        : isArretee
+          ? '<span class="pill pill-danger"><span class="pill-dot"></span>Arrêtée</span>'
+          : '<span class="pill" style="background:var(--bg);color:var(--text-tertiary)"><span class="pill-dot" style="background:var(--gray-dot)"></span>Expirée</span>';
+      return `
+        <div class="tl-row">
+          <div class="tl-dot" style="background:${isActive?'var(--green-dot)':isArretee?'var(--red-dot)':'var(--gray-dot)'}"></div>
+          <div class="tl-info">
+            <div class="tl-name">💊 ${p.medicament} <span style="font-size:11px;color:var(--text-secondary)">${p.dosage}</span></div>
+            <div class="tl-sub">${p.nb_prises_jour} prise(s)/jour · ${p.medecin}</div>
+            <div class="tl-sub" style="margin-top:2px">Du ${p.date_debut} → ${p.date_fin} · ${duree} jour(s)</div>
+          </div>
+          <div class="tl-right">${pillHtml}</div>
+        </div>`;
+    }).join('');
+  } else if (divRx) {
+    divRx.innerHTML = '<div class="loading">Aucune prescription</div>';
+  }
 }
 
 function switchSubTab(id, el) {
