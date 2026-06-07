@@ -494,7 +494,6 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
         <input type="text" id="np-code-existant" placeholder="Code d'activation (MB-YYYY-XXXX)"
           style="font-family:monospace;letter-spacing:2px"
           oninput="this.value=this.value.toUpperCase()">
-        <input type="text" id="np-medecin-existant" placeholder="Votre nom (médecin référent)">
       </div>
 
       <div style="display:flex;gap:8px;margin-top:8px">
@@ -1766,7 +1765,6 @@ function fermerFormulairePatient() {
   document.getElementById('np-nom').value = '';
   document.getElementById('np-medecin').value = '';
   document.getElementById('np-code-existant').value = '';
-  document.getElementById('np-medecin-existant').value = '';
 }
 
 function toggleModePatient(mode) {
@@ -1783,13 +1781,11 @@ async function creerPatient() {
   const modeExistant = document.getElementById('form-patient-existant').style.display !== 'none';
 
   if (modeExistant) {
-    // Patient existant — via code activation
     const code = document.getElementById('np-code-existant').value.trim().toUpperCase();
-    const medecin = document.getElementById('np-medecin-existant').value.trim();
     if (!code) { showToast('Code d\'activation obligatoire'); return; }
     const res = await api('/patients/creer', {
       method: 'POST',
-      body: JSON.stringify({ code_activation_existant: code, medecin })
+      body: JSON.stringify({ code_activation_existant: code })
     });
     if (res?.success) {
       fermerFormulairePatient();

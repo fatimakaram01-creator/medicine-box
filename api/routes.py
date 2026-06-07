@@ -154,27 +154,20 @@ def creer_patient(body: dict):
         code_existant = body.get("code_activation_existant", "").strip().upper()
         medecin = body.get("medecin", "")
 
-        # ── Cas 1 : Patient existant — ajouter ce médecin ──
+        # ── Cas 1 : Patient existant — associer à ce médecin ──
         if code_existant:
             cursor.execute("""
-                SELECT id, prenom, nom, medecin FROM patients
+                SELECT id, prenom, nom FROM patients
                 WHERE code_activation = %s;
             """, (code_existant,))
             row = cursor.fetchone()
             if not row:
                 cursor.close()
                 return {"error": "Code d'activation introuvable — vérifiez le code du patient"}
-            patient_id = row[0]
-            # Mettre à jour le médecin référent si différent
-            if medecin and medecin != row[3]:
-                cursor.execute("""
-                    UPDATE patients SET medecin = %s WHERE id = %s;
-                """, (medecin, patient_id))
-                conn.commit()
             cursor.close()
             return {
                 "success": True,
-                "patient_id": patient_id,
+                "patient_id": row[0],
                 "code_activation": code_existant,
                 "prenom": row[1],
                 "nom": row[2],
