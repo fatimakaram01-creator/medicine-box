@@ -725,11 +725,28 @@ let patientActifId = null;     // patient connecté en mode patient (via code ac
 
 const REFRESH_MS = 30000;
 
-async function api(path, opts = {}) {
-  try {
-    const r = await fetch(API + path, { headers: { 'Content-Type': 'application/json' }, ...opts });
-    return await r.json();
-  } catch (e) { console.error('API error:', path, e); return null; }
+async function api(path, opts = {}, retries = 2) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000); // 15s timeout
+      const r = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        ...opts
+      });
+      clearTimeout(timeout);
+      return await r.json();
+    } catch (e) {
+      if (i < retries) {
+        console.warn(`API retry ${i+1}/${retries}: ${path}`);
+        await new Promise(r => setTimeout(r, 2000 * (i + 1)));
+      } else {
+        console.error('API error:', path, e);
+        return null;
+      }
+    }
+  }
 }
 
 function formatDate(d) {
@@ -763,11 +780,16 @@ function dotForStatut(s) {
 }
 
 async function loadAll() {
-  // Charger liste patients pour le dashboard médecin
-  const patientsList = await api('/patients/liste');
+  // Wake-up : ping le serveur d'abord pour le réveiller si endormi
+  let patientsList = await api('/patients/liste');
+  // Si null → serveur endormi → attendre et réessayer
+  if (!patientsList) {
+    showToast('⏳ Connexion au serveur...');
+    await new Promise(r => setTimeout(r, 5000));
+    patientsList = await api('/patients/liste');
+  }
   if (patientsList && Array.isArray(patientsList)) {
     renderPatientCards(patientsList);
-    // Sélectionner le premier patient par défaut si aucun sélectionné (mode médecin)
     if (!selectedPatientId && patientsList.length > 0) {
       selectedPatientId = patientsList[0].id;
     }
