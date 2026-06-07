@@ -793,21 +793,22 @@ async function loadAll() {
   renderBanners(config);
   if (config) { renderConfig(config); renderMedecinStatus(config); }
 
-  const hist = await api('/prises/historique');
+  const hist = await api(`/prises/historique${pid}`);
   if (hist) {
     renderHistPrises(hist);
-    renderPatientPage(patients, prises, alertes, observance, hist); // re-render avec hist
+    renderPatientPage(patients, prises, alertes, observance, hist);
   }
 
   const profils = await api('/intervalles/profils');
   if (profils) {
-    renderContextesSpeciaux(profils);   // → page patient
-    renderProfilsHistorique(profils);   // → page médecin
-    renderProfilActifMedecin(profils);  // → page médecin lecture seule
+    renderContextesSpeciaux(profils);
+    renderProfilsHistorique(profils);
+    renderProfilActifMedecin(profils);
   }
 
   const rxHist = await api(`/prescriptions/historique${pid}`);
-  if (rxHist) renderHistPrescriptions(rxHist);
+  if (Array.isArray(rxHist)) renderHistPrescriptions(rxHist);
+  else renderHistPrescriptions([]);
 
   // Historique dans l'interface médecin (filtré par patient sélectionné)
   const histMed = await api(`/prises/historique${pid}`);
