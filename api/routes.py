@@ -177,11 +177,11 @@ def creer_patient(body: dict):
 
 
 @router.post("/patients/activer-boite")
-def activer_boite(body: dict):
+def activer_boite(body: dict, request: Request):
     """
-    Reçu depuis la boîte ESP32 lors de la première configuration.
-    La boîte envoie le code d'activation saisi par le patient.
-    Retourne le patient_id correspondant.
+    Reçu depuis la boîte ESP32 lors de la première configuration,
+    ou depuis l'app web quand un patient change de compte.
+    Retourne le patient_id correspondant et publie via MQTT si boîte connectée.
     """
     code = body.get("code_activation", "").strip().upper()
     if not code:
@@ -198,9 +198,28 @@ def activer_boite(body: dict):
         cursor.close()
         if not row:
             return {"success": False, "error": "Code invalide"}
+
+        patient_id = row[0]
+
+        # Publier via MQTT pour mettre à jour l'ESP32 en temps réel
+        try:
+            mqtt_client = getattr(request.app.state, 'mqtt_client', None)
+            if mqtt_client and mqtt_client.is_connected():
+                import json as json_mod
+                payload = json_mod.dumps({
+                    "action": "changer_patient",
+                    "patient_id": patient_id,
+                    "prenom": row[1],
+                    "nom": row[2]
+                })
+                mqtt_client.publish("medicinebox/commande", payload)
+                print(f"[MQTT] changer_patient → patient_{patient_id}")
+        except Exception as e:
+            print(f"[MQTT] Erreur publication changer_patient : {e}")
+
         return {
             "success": True,
-            "patient_id": row[0],
+            "patient_id": patient_id,
             "prenom": row[1],
             "nom": row[2],
             "message": f"Boîte liée à {row[1]} {row[2]}"
