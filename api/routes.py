@@ -672,9 +672,25 @@ def arreter_traitement(patient_id: int = None):
         conn.commit()
         cursor.close()
 
-        # ── Mettre system_on = FALSE ──
-        config_state["system_on"] = False
-        sauvegarder_system_on(False)
+        # ── Mettre system_on = FALSE par patient ──
+        sauvegarder_system_on(False, patient_id)
+
+        # Notifier l'ESP32 via MQTT
+        try:
+            from api.main import app as main_app
+            mqtt_client = getattr(main_app.state, 'mqtt_client', None)
+            if mqtt_client and mqtt_client.is_connected():
+                import json as json_mod
+                # system_off
+                mqtt_client.publish(f"medicinebox/config/{patient_id}", json_mod.dumps({"mode": "system_off", "enabled": False}))
+                # prescription_arretee
+                mqtt_client.publish("medicinebox/commande", json_mod.dumps({
+                    "action": "prescription_arretee",
+                    "patient_id": patient_id
+                }))
+                print(f"[MQTT] prescription_arretee + system_off → patient_{patient_id}")
+        except Exception as e:
+            print(f"[MQTT] Erreur : {e}")
 
         creer_alerte_systeme("contexte", "Traitement arrêté par le médecin")
         return {"status": "ok", "message": "Traitement arrêté — le système est mis en pause"}
