@@ -400,18 +400,20 @@ def get_config_status(patient_id: int = None):
 @router.post("/config/remplissage")
 def toggle_remplissage(body: ConfigToggle, request: Request, patient_id: int = None):
     config_state["remplissage"] = body.enabled
+    pid = get_patient_id_from_db(patient_id)
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
     if mqtt_client and mqtt_client.is_connected():
-        mqtt_client.publish("medicinebox/config", json.dumps({"mode": "remplissage", "enabled": body.enabled}))
+        mqtt_client.publish(f"medicinebox/config/{pid}", json.dumps({"mode": "remplissage", "enabled": body.enabled}))
     return {"status": "ok", "message": f"Mode remplissage {'activé' if body.enabled else 'désactivé'}"}
 
 
 @router.post("/config/buzzer")
 def toggle_buzzer(body: ConfigToggle, request: Request, patient_id: int = None):
     config_state["buzzer"] = body.enabled
+    pid = get_patient_id_from_db(patient_id)
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
     if mqtt_client and mqtt_client.is_connected():
-        mqtt_client.publish("medicinebox/config", json.dumps({"mode": "buzzer", "enabled": body.enabled}))
+        mqtt_client.publish(f"medicinebox/config/{pid}", json.dumps({"mode": "buzzer", "enabled": body.enabled}))
     return {"status": "ok", "message": f"Buzzer {'activé' if body.enabled else 'désactivé'}"}
 
 
@@ -427,16 +429,17 @@ def toggle_ramadan(body: ConfigRamadan, request: Request, patient_id: int = None
         "Fes": {"fajr": "04:15", "iftar": "19:35"},
         "Tanger": {"fajr": "04:10", "iftar": "19:30"},
     }
+    pid = get_patient_id_from_db(patient_id)
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
     if body.enabled and body.ville:
         horaires = horaires_ramadan.get(body.ville, {"fajr": "04:30", "iftar": "19:45"})
         if mqtt_client and mqtt_client.is_connected():
-            mqtt_client.publish("medicinebox/config", json.dumps({"mode": "ramadan", "enabled": True, "ville": body.ville, "fajr": horaires["fajr"], "iftar": horaires["iftar"]}))
+            mqtt_client.publish(f"medicinebox/config/{pid}", json.dumps({"mode": "ramadan", "enabled": True, "ville": body.ville, "fajr": horaires["fajr"], "iftar": horaires["iftar"]}))
         creer_alerte_systeme("contexte", f"Mode Ramadan activé — {body.ville}")
         return {"status": "ok", "message": f"Mode Ramadan activé — {body.ville}", "horaires": {"shour": f"Avant {horaires['fajr']}", "midi": "Suspendu (jeûne)", "iftar": f"Après {horaires['iftar']}"}}
     else:
         if mqtt_client and mqtt_client.is_connected():
-            mqtt_client.publish("medicinebox/config", json.dumps({"mode": "ramadan", "enabled": False}))
+            mqtt_client.publish(f"medicinebox/config/{pid}", json.dumps({"mode": "ramadan", "enabled": False}))
         creer_alerte_systeme("contexte", "Mode Ramadan désactivé")
         return {"status": "ok", "message": "Mode Ramadan désactivé"}
 
@@ -445,9 +448,10 @@ def toggle_ramadan(body: ConfigRamadan, request: Request, patient_id: int = None
 def toggle_hospitalisation(body: ConfigHospitalisation, request: Request, patient_id: int = None):
     config_state["hospitalisation"] = body.enabled
     config_state["hospitalisation_date_retour"] = body.date_retour if body.enabled else None
+    pid = get_patient_id_from_db(patient_id)
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
     if mqtt_client and mqtt_client.is_connected():
-        mqtt_client.publish("medicinebox/config", json.dumps({"mode": "hospitalisation", "enabled": body.enabled, "date_retour": body.date_retour}))
+        mqtt_client.publish(f"medicinebox/config/{pid}", json.dumps({"mode": "hospitalisation", "enabled": body.enabled, "date_retour": body.date_retour}))
     if body.enabled:
         creer_alerte_systeme("contexte", "Patient hospitalisé")
         return {"status": "ok", "message": "Système suspendu — hospitalisation"}

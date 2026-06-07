@@ -130,12 +130,6 @@ async def tache_alertes(mqtt_client):
 
     while True:
         try:
-            # ── Vérifier que le système est ON ──
-            # Si le patient a arrêté le système → ne rien faire
-            if not config_state.get("system_on", False):
-                await asyncio.sleep(60)
-                continue
-
             # ── Vérifier que le mode hospitalisation n'est pas actif ──
             if config_state.get("hospitalisation", False):
                 await asyncio.sleep(60)
@@ -167,6 +161,10 @@ async def tache_alertes(mqtt_client):
                     await asyncio.sleep(60)
                     continue
                 for (patient_id,) in all_patients:
+                    # Vérifier system_on par patient
+                    from api.routes import lire_system_on
+                    if not lire_system_on(patient_id):
+                        continue  # système OFF → pas d'alertes pour ce patient
 
                     # ── Chercher les alertes prévues pour cette minute ──
                     #
@@ -302,11 +300,7 @@ async def tache_doses_manquees(mqtt_client):
 
     while True:
         try:
-            # ── Vérifier que le système est ON ──
-            if not config_state.get("system_on", False):
-                await asyncio.sleep(300)
-                continue
-
+            # ── Vérifier hospitalisation ──
             if config_state.get("hospitalisation", False):
                 await asyncio.sleep(300)
                 continue
@@ -336,6 +330,10 @@ async def tache_doses_manquees(mqtt_client):
                     await asyncio.sleep(300)
                     continue
                 for (patient_id,) in all_patients:
+                    # Vérifier system_on par patient
+                    from api.routes import lire_system_on
+                    if not lire_system_on(patient_id):
+                        continue  # système OFF → pas de détection doses manquées
 
                     # ── Vérifier chaque moment actif du profil ──
                     for moment, heure_fin in fin_intervalle.items():
