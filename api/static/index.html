@@ -493,6 +493,21 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
     </div>
   </div>
 
+  <!-- Modale modification patient -->
+  <div class="new-patient-form" id="edit-patient-form">
+    <div class="section-label">✏️ Modifier le patient</div>
+    <input type="hidden" id="edit-patient-id">
+    <div class="input-wrap" style="margin-top:0">
+      <input type="text" id="edit-prenom" placeholder="Prénom">
+      <input type="text" id="edit-nom" placeholder="Nom">
+      <input type="text" id="edit-medecin" placeholder="Médecin référent">
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-primary" onclick="sauvegarderPatient()" style="flex:1">Enregistrer</button>
+        <button class="btn" onclick="fermerModifierPatient()" style="flex:1">Annuler</button>
+      </div>
+    </div>
+  </div>
+
   <div id="medecin-status-banner-2"></div>
   <div class="page-header">
     <div><div class="page-header-title" id="medecin-titre">Dashboard médecin</div><div class="page-header-sub" id="medecin-sub"></div></div>
@@ -1649,11 +1664,16 @@ function renderPatientCards(patients) {
         <div style="margin-top:6px">
           <span class="pill ${obsCls}" style="font-size:10px"><span class="pill-dot"></span>${p.observance_7j}% obs.</span>
         </div>
+        <div style="display:flex;gap:6px;margin-top:8px" onclick="event.stopPropagation()">
+          <button onclick="ouvrirModifierPatient(${p.id},'${p.prenom}','${p.nom}','${p.medecin||''}')"
+            style="flex:1;padding:5px 0;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-secondary)">✏️ Modifier</button>
+          <button onclick="supprimerPatient(${p.id},'${p.prenom} ${p.nom}')"
+            style="flex:1;padding:5px 0;font-size:11px;background:var(--bg);border:1px solid #E24B4A44;border-radius:6px;cursor:pointer;color:#E24B4A">🗑️ Suppr.</button>
+        </div>
       </div>
     `;
   }).join('');
 
-  // Bouton ajouter nouveau patient
   html += `
     <div class="patient-card add-new" onclick="ouvrirFormulairePatient()">
       <div style="font-size:22px">+</div>
@@ -1873,7 +1893,8 @@ function renderProfilsHistorique(profils) {
         <div style="display:flex;align-items:center;gap:6px">
           ${p.actif
             ? '<span class="pill pill-ok"><span class="pill-dot"></span>Actif</span>'
-            : `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="activerProfil(${p.id})">Réactiver</button>`
+            : `<button class="btn" style="font-size:11px;padding:4px 10px" onclick="activerProfil(${p.id})">Réactiver</button>
+               <button onclick="supprimerProfil(${p.id},'${p.label}')" style="font-size:11px;padding:4px 8px;background:none;border:1px solid #E24B4A44;border-radius:6px;cursor:pointer;color:#E24B4A">🗑️</button>`
           }
         </div>
       </div>
@@ -1939,6 +1960,70 @@ async function activerProfil(id) {
     }
   } else {
     showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
+// ── Modifier patient ──
+function ouvrirModifierPatient(id, prenom, nom, medecin) {
+  document.getElementById('edit-patient-id').value = id;
+  document.getElementById('edit-prenom').value = prenom;
+  document.getElementById('edit-nom').value = nom;
+  document.getElementById('edit-medecin').value = medecin || '';
+  document.getElementById('new-patient-form').classList.remove('open');
+  document.getElementById('edit-patient-form').classList.add('open');
+  document.getElementById('edit-patient-form').scrollIntoView({ behavior: 'smooth' });
+}
+
+function fermerModifierPatient() {
+  document.getElementById('edit-patient-form').classList.remove('open');
+}
+
+async function sauvegarderPatient() {
+  const id = document.getElementById('edit-patient-id').value;
+  const prenom = document.getElementById('edit-prenom').value.trim();
+  const nom = document.getElementById('edit-nom').value.trim();
+  const medecin = document.getElementById('edit-medecin').value.trim();
+  if (!prenom || !nom) { showToast('Prénom et nom obligatoires'); return; }
+  const res = await api(`/patients/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ prenom, nom, medecin })
+  });
+  if (res?.success) {
+    showToast(`✅ Patient ${res.prenom} ${res.nom} modifié`);
+    fermerModifierPatient();
+    loadAll();
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
+// ── Supprimer patient ──
+async function supprimerPatient(id, nom) {
+  if (!confirm(`Supprimer ${nom} ? Toutes ses données seront effacées.`)) return;
+  const res = await api(`/patients/${id}`, { method: 'DELETE' });
+  if (res?.success) {
+    showToast(`✅ ${nom} supprimé`);
+    if (selectedPatientId === id) selectedPatientId = null;
+    loadAll();
+  } else {
+    showToast('Erreur : ' + (res?.error || 'inconnue'));
+  }
+}
+
+// ── Supprimer profil intervalle ──
+async function supprimerProfil(id, label) {
+  if (!confirm(`Supprimer le profil "${label}" ?`)) return;
+  const res = await api(`/intervalles/profils/${id}`, { method: 'DELETE' });
+  if (res?.success) {
+    showToast(`✅ Profil "${label}" supprimé`);
+    const profils = await api('/intervalles/profils');
+    if (profils) {
+      renderContextesSpeciaux(profils);
+      renderProfilsHistorique(profils);
+      renderProfilActifMedecin(profils);
+    }
+  } else {
+    showToast('❌ ' + (res?.error || 'Erreur suppression'));
   }
 }
 
