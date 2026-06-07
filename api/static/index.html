@@ -546,6 +546,21 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="ctrl-card">
     <div class="section-label">Créer / modifier une prescription</div>
     <div class="input-wrap">
+      <!-- Toggle mode prescription -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:8px">
+        <button id="btn-rx-remplacer" onclick="toggleModeRx('remplacer')"
+          style="flex:1;padding:8px;font-size:11px;font-weight:500;background:var(--teal);color:#fff;border:none;cursor:pointer">
+          🔄 Changer traitement
+        </button>
+        <button id="btn-rx-nouveau" onclick="toggleModeRx('nouveau')"
+          style="flex:1;padding:8px;font-size:11px;font-weight:500;background:var(--bg);color:var(--text-secondary);border:none;cursor:pointer">
+          ➕ Ajouter médicament
+        </button>
+      </div>
+      <div id="rx-mode-hint" style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">
+        Remplace la prescription actuelle par la nouvelle
+      </div>
+      <input type="hidden" id="rx-mode" value="remplacer">
       <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
       <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
       <select id="rx-frequence">
@@ -555,7 +570,7 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       </select>
       <input type="text" id="rx-prescripteur" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
       <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
-      <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider la nouvelle prescription</button>
+      <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider</button>
     </div>
   </div>
   <div class="ctrl-card">
@@ -1168,13 +1183,26 @@ async function toggleHospitalisation() {
   }
 }
 
+function toggleModeRx(mode) {
+  document.getElementById('rx-mode').value = mode;
+  const isRemplacer = mode === 'remplacer';
+  document.getElementById('btn-rx-remplacer').style.background = isRemplacer ? 'var(--teal)' : 'var(--bg)';
+  document.getElementById('btn-rx-remplacer').style.color = isRemplacer ? '#fff' : 'var(--text-secondary)';
+  document.getElementById('btn-rx-nouveau').style.background = isRemplacer ? 'var(--bg)' : 'var(--teal)';
+  document.getElementById('btn-rx-nouveau').style.color = isRemplacer ? 'var(--text-secondary)' : '#fff';
+  document.getElementById('rx-mode-hint').textContent = isRemplacer
+    ? 'Remplace la prescription actuelle par la nouvelle'
+    : 'Ajoute un médicament supplémentaire — les prescriptions actives sont conservées';
+}
+
 async function changerRx() {
   const data = {
     medicament: document.getElementById('rx-medicament').value,
     dosage: document.getElementById('rx-dosage').value,
     frequence: parseInt(document.getElementById('rx-frequence').value),
     prescrit_par: document.getElementById('rx-prescripteur').value,
-    duree_jours: parseInt(document.getElementById('rx-duree').value)
+    duree_jours: parseInt(document.getElementById('rx-duree').value),
+    mode: document.getElementById('rx-mode').value
   };
   const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
   const res = await api(`/config/changement-rx${pidParam}`, { method: 'POST', body: JSON.stringify(data) });

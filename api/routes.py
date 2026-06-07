@@ -41,6 +41,7 @@ class ChangementRx(BaseModel):
     frequence: int
     prescrit_par: str
     duree_jours: int
+    mode: str = "remplacer"  # "remplacer" ou "nouveau" (polythérapie)
 
 
 # ═══════════════════════════════════════════════════════
@@ -595,25 +596,24 @@ def changement_rx(body: ChangementRx, patient_id: int = None):
             cursor.close()
             return {"error": "Aucun patient trouvé"}
 
-        # ── Désactiver l'ancienne prescription active ──
-        # Sans ça, l'ancienne et la nouvelle coexistent
-        # → le système génèrerait des prises en double
-        # date_fin = hier pour que la nouvelle (aujourd'hui) ne soit pas bloquée
-        cursor.execute("""
-            UPDATE prescriptions
-            SET active = FALSE, date_fin = CURRENT_DATE - INTERVAL '1 day'
-            WHERE patient_id = %s AND active = TRUE;
-        """, (patient_id,))
+        # mode : "nouveau" (polythérapie) ou "remplacer" (changement traitement)
+        mode = getattr(body, 'mode', 'remplacer')
 
-        # ── Supprimer les prises en_attente du jour ──
-        # Les prises générées par l'ancienne prescription
-        # ne sont plus valides → on les supprime
-        cursor.execute("""
-            DELETE FROM prises
-            WHERE patient_id = %s
-              AND statut = 'en_attente'
-              AND heure_prevue::date = CURRENT_DATE;
-        """, (patient_id,))
+        if mode == 'remplacer':
+            # ── Changement de traitement : désactiver l'ancienne prescription ──
+            cursor.execute("""
+                UPDATE prescriptions
+                SET active = FALSE, date_fin = CURRENT_DATE - INTERVAL '1 day'
+                WHERE patient_id = %s AND active = TRUE;
+            """, (patient_id,))
+            # Supprimer les prises en_attente du jour
+            cursor.execute("""
+                DELETE FROM prises
+                WHERE patient_id = %s
+                  AND statut = 'en_attente'
+                  AND heure_prevue::date = CURRENT_DATE;
+            """, (patient_id,))
+        # mode 'nouveau' (polythérapie) → garder les prescriptions actives existantes
 
         # ── Médicament : retrouver ou créer ──
         cursor.execute("SELECT id FROM medicaments WHERE nom = %s;", (body.medicament,))
@@ -648,7 +648,7 @@ def changement_rx(body: ChangementRx, patient_id: int = None):
 
         conn.commit()
         cursor.close()
-        creer_alerte_systeme("contexte", f"Nouvelle prescription : {body.medicament} × {body.frequence}/jour")
+        creer_alerte_systeme("contexte", f"{'Nouveau médicament ajouté' if mode == 'nouveau' else 'Prescription modifiée'} : {body.medicament} × {body.frequence}/jour")
 
         # Notifier l'ESP32 via MQTT — prescription créée pour ce patient
         try:
