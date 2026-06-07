@@ -613,6 +613,22 @@ def changement_rx(body: ChangementRx, patient_id: int = None):
         conn.commit()
         cursor.close()
         creer_alerte_systeme("contexte", f"Nouvelle prescription : {body.medicament} × {body.frequence}/jour")
+
+        # Notifier l'ESP32 via MQTT — prescription créée pour ce patient
+        try:
+            from api.main import app as main_app
+            mqtt_client = getattr(main_app.state, 'mqtt_client', None)
+            if mqtt_client and mqtt_client.is_connected():
+                import json as json_mod
+                payload = json_mod.dumps({
+                    "action": "prescription_activee",
+                    "patient_id": patient_id
+                })
+                mqtt_client.publish("medicinebox/commande", payload)
+                print(f"[MQTT] prescription_activee → patient_{patient_id}")
+        except Exception as e:
+            print(f"[MQTT] Erreur publication prescription : {e}")
+
         return {"status": "ok", "message": f"Prescription créée : {body.medicament} × {body.frequence}/jour", "prescription_id": prescription_id}
     except Exception as e:
         return {"error": str(e)}
