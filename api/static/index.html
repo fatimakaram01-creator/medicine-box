@@ -799,7 +799,11 @@ async function loadAll() {
     renderPatientPage(patients, prises, alertes, observance, hist);
   }
 
-  const profils = await api('/intervalles/profils');
+  let profils = await api('/intervalles/profils');
+  if (!profils) {
+    await new Promise(r => setTimeout(r, 3000));
+    profils = await api('/intervalles/profils');
+  }
   if (profils) {
     renderContextesSpeciaux(profils);
     renderProfilsHistorique(profils);
