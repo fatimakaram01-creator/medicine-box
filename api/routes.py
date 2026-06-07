@@ -816,6 +816,164 @@ def get_prescriptions_historique(patient_id: int = None):
         conn.close()
 
 
+@router.get("/intervalles/profil-actif")
+def get_profil_actif_firmware():
+    """Retourne le profil actif avec les heures brutes — utilisé par le firmware ESP32"""
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, label,
+                   matin_debut::text, matin_fin::text,
+                   midi_debut::text,  midi_fin::text,
+                   soir_debut::text,  soir_fin::text
+            FROM intervalles_profils WHERE actif = TRUE;
+        """)
+        row = cursor.fetchone()
+        cursor.close()
+        if not row:
+            return {
+                "matin_debut": "06:00:00", "matin_fin": "12:00:00",
+                "midi_debut":  "12:00:00", "midi_fin":  "18:00:00",
+                "soir_debut":  "18:00:00", "soir_fin":  "22:00:00"
+            }
+        return {
+            "id": row[0], "label": row[1],
+            "matin_debut": row[2], "matin_fin": row[3],
+            "midi_debut":  row[4], "midi_fin":  row[5],
+            "soir_debut":  row[6], "soir_fin":  row[7]
+        }
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+def _regenerer_prises_du_jour(conn_externe=None):
+    """
+    Supprime et régénère les prises EN_ATTENTE du jour pour tous les patients
+    selon le nouveau profil actif. Appelé après changement d'intervalle.
+    """
+    conn = conn_externe or get_connection()
+    try:
+        cursor = conn.cursor()
+        moments_config = _get_moments_config()
+        cursor.execute("SELECT id FROM patients WHERE active = TRUE;")
+        patients = [r[0] for r in cursor.fetchall()]
+        for patient_id in patients:
+            # Supprimer uniquement les prises en_attente d'aujourd'hui
+            cursor.execute("""
+                DELETE FROM prises
+                WHERE patient_id = %s
+                  AND statut = 'en_attente'
+                  AND heure_prevue::date = CURRENT_DATE;
+            """, (patient_id,))
+            # Récupérer prescription active
+            cursor.execute("""
+                SELECT id FROM prescriptions
+                WHERE patient_id = %s AND active = TRUE
+                LIMIT 1;
+            """, (patient_id,))
+            presc = cursor.fetchone()
+            if not presc:
+                continue
+            aujourd_hui = datetime.today().date()
+            for moment, heure_str in moments_config.items():
+                heure_prevue = datetime.combine(aujourd_hui, datetime.strptime(heure_str, "%H:%M:%S").time())
+                cursor.execute("""
+                    INSERT INTO prises (patient_id, prescription_id, moment, heure_prevue, statut)
+                    VALUES (%s, %s, %s, %s, 'en_attente');
+                """, (patient_id, presc[0], moment, heure_prevue))
+        conn.commit()
+        cursor.close()
+        print(f"✅ Prises du jour régénérées pour {len(patients)} patient(s)")
+    except Exception as e:
+        print(f"❌ Erreur régénération prises : {e}")
+    finally:
+        if not conn_externe:
+            conn.close()
+
+
+# ── Supprimer un patient ──
+@router.delete("/patients/{patient_id}")
+def supprimer_patient(patient_id: int):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT prenom, nom FROM patients WHERE id = %s;", (patient_id,))
+        row = cursor.fetchone()
+        if not row:
+            return {"error": "Patient introuvable"}
+        cursor.execute("""
+            DELETE FROM alertes_optimisation WHERE patient_id = %s;
+            DELETE FROM alertes WHERE patient_id = %s;
+            DELETE FROM prises WHERE patient_id = %s;
+        """, (patient_id, patient_id, patient_id))
+        cursor.execute("""
+            DELETE FROM prescription_doses WHERE prescription_id IN (
+                SELECT id FROM prescriptions WHERE patient_id = %s
+            );
+        """, (patient_id,))
+        cursor.execute("DELETE FROM prescriptions WHERE patient_id = %s;", (patient_id,))
+        cursor.execute("DELETE FROM patients WHERE id = %s;", (patient_id,))
+        conn.commit()
+        cursor.close()
+        return {"success": True, "message": f"Patient {row[0]} {row[1]} supprimé"}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+# ── Modifier un patient ──
+@router.put("/patients/{patient_id}")
+def modifier_patient(patient_id: int, body: dict):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        prenom = body.get("prenom")
+        nom = body.get("nom")
+        medecin = body.get("medecin")
+        cursor.execute("""
+            UPDATE patients SET prenom = COALESCE(%s, prenom),
+                                nom = COALESCE(%s, nom),
+                                medecin = COALESCE(%s, medecin)
+            WHERE id = %s RETURNING prenom, nom;
+        """, (prenom, nom, medecin, patient_id))
+        row = cursor.fetchone()
+        if not row:
+            return {"error": "Patient introuvable"}
+        conn.commit()
+        cursor.close()
+        return {"success": True, "prenom": row[0], "nom": row[1]}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+# ── Supprimer un profil intervalle ──
+@router.delete("/intervalles/profils/{profil_id}")
+def supprimer_profil(profil_id: int):
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT actif, label FROM intervalles_profils WHERE id = %s;", (profil_id,))
+        row = cursor.fetchone()
+        if not row:
+            return {"error": "Profil introuvable"}
+        if row[0]:
+            return {"error": "Impossible de supprimer le profil actif — activez-en un autre d'abord"}
+        cursor.execute("DELETE FROM intervalles_profils WHERE id = %s;", (profil_id,))
+        conn.commit()
+        cursor.close()
+        return {"success": True, "message": f"Profil '{row[1]}' supprimé"}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        conn.close()
+
+
 @router.get("/intervalles/profils")
 def get_intervalles_profils():
     """Retourne tous les profils d'intervalles (historique complet)"""
@@ -891,6 +1049,8 @@ def creer_profil(data: NouveauProfil):
         conn.commit()
         cursor.close()
         creer_alerte_systeme("contexte", f"Nouveau profil horaire créé : {data.label}")
+        # Regénérer les prises du jour avec les nouveaux intervalles
+        _regenerer_prises_du_jour(conn_externe=None)
         return {"success": True, "id": new_id}
     except Exception as e:
         return {"error": str(e)}
@@ -935,6 +1095,8 @@ def activer_profil(profil_id: int):
         conn.commit()
         cursor.close()
         creer_alerte_systeme("contexte", f"Profil horaire réactivé : {label}")
+        # Regénérer les prises du jour avec les nouveaux intervalles
+        _regenerer_prises_du_jour(conn_externe=None)
         return {"success": True, "label": label}
     except Exception as e:
         return {"error": str(e)}
