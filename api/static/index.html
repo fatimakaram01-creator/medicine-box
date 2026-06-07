@@ -711,6 +711,9 @@ function deleteCookie(name) {
 }
 
 // Cacher les banners au démarrage (avant choix du rôle)
+let selectedPatientId = null;  // patient actuellement sélectionné dans le dashboard médecin
+let patientActifId = null;     // patient connecté en mode patient (via code activation)
+
 document.addEventListener('DOMContentLoaded', () => {
   ['wifi-banner','connected-banner','system-banner','system-on-banner'].forEach(id => {
     const el = document.getElementById(id);
@@ -720,8 +723,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const savedPid = getCookie('patient_id');
   if (savedPid) patientActifId = parseInt(savedPid);
 });
-let selectedPatientId = null;  // patient actuellement sélectionné dans le dashboard médecin
-let patientActifId = null;     // patient connecté en mode patient (via code activation)
 
 const REFRESH_MS = 30000;
 
