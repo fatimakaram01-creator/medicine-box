@@ -245,7 +245,10 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <!-- Indicateur de rôle actif -->
   <div id="role-indicator" style="display:none;padding:0 16px;height:36px;display:none;align-items:center;justify-content:space-between;border-top:0.5px solid var(--border)">
     <div id="role-label" style="font-size:12px;font-weight:500;color:var(--text-secondary)"></div>
-    <button onclick="retourAccueil()" style="background:none;border:none;font-size:11px;color:var(--text-tertiary);cursor:pointer;text-decoration:underline">Changer de rôle</button>
+    <div style="display:flex;gap:12px;align-items:center">
+      <button id="btn-changer-compte" onclick="changerCompte()" style="display:none;background:none;border:none;font-size:11px;color:var(--teal);cursor:pointer;text-decoration:underline">Changer de compte</button>
+      <button onclick="retourAccueil()" style="background:none;border:none;font-size:11px;color:var(--text-tertiary);cursor:pointer;text-decoration:underline">Changer de rôle</button>
+    </div>
   </div>
 </nav>
 
@@ -657,14 +660,28 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
 <script>
 const API = 'https://medicine-box-zk7r.onrender.com';
 
+// ── Fonctions cookie persistant ──
+function setCookie(name, value, days) {
+  const d = new Date();
+  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+}
+function getCookie(name) {
+  const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+  return v ? v.pop() : null;
+}
+function deleteCookie(name) {
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/`;
+}
+
 // Cacher les banners au démarrage (avant choix du rôle)
 document.addEventListener('DOMContentLoaded', () => {
   ['wifi-banner','connected-banner','system-banner','system-on-banner'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
-  // Restaurer patient connecté depuis localStorage si présent
-  const savedPid = localStorage.getItem('patient_id');
+  // Restaurer patient connecté depuis cookie persistant (1 an)
+  const savedPid = getCookie('patient_id');
   if (savedPid) patientActifId = parseInt(savedPid);
 });
 let selectedPatientId = null;  // patient actuellement sélectionné dans le dashboard médecin
@@ -1221,8 +1238,8 @@ async function activerPatient() {
     const data = await res.json();
     if (res.ok && data.patient_id) {
       patientActifId = data.patient_id;
-      localStorage.setItem('patient_id', data.patient_id);
-      localStorage.setItem('patient_code', code);
+      setCookie('patient_id', data.patient_id, 365);
+      setCookie('patient_code', code, 365);
       document.getElementById('page-activation').style.display = 'none';
       _activerRole('patient');
     } else {
@@ -1235,13 +1252,35 @@ async function activerPatient() {
   btn.disabled = false;
 }
 
+function changerCompte() {
+  // Effacer le cookie → retour à l'écran de saisie code
+  patientActifId = null;
+  deleteCookie('patient_id');
+  deleteCookie('patient_code');
+  document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
+  document.getElementById('page-activation').style.display = 'flex';
+  document.getElementById('activation-code-input').value = '';
+  document.getElementById('activation-error').textContent = '';
+  const btnCC = document.getElementById('btn-changer-compte');
+  if (btnCC) btnCC.style.display = 'none';
+  setTimeout(() => document.getElementById('activation-code-input').focus(), 100);
+}
+
 function choisirRole(role) {
   if (role === 'medecin') {
     pendingRole = role;
     openPinOverlay();
     return;
   }
-  // Mode patient → écran de saisie code d'activation
+  // Mode patient → vérifier si cookie présent
+  const savedPid = getCookie('patient_id');
+  if (savedPid) {
+    // Déjà connecté → aller direct au dashboard
+    patientActifId = parseInt(savedPid);
+    _activerRole('patient');
+    return;
+  }
+  // Pas de cookie → écran de saisie code d'activation
   document.getElementById('page-accueil').style.display = 'none';
   document.getElementById('page-activation').style.display = 'flex';
   document.getElementById('activation-code-input').value = '';
@@ -1274,10 +1313,13 @@ function _activerRole(role) {
   // Mettre à jour l'indicateur de rôle
   const indicator = document.getElementById('role-indicator');
   const label = document.getElementById('role-label');
+  const btnCC = document.getElementById('btn-changer-compte');
   if (indicator && label) {
     indicator.style.display = 'flex';
     label.textContent = role === 'patient' ? '👤 Mode Patient' : '🩺 Mode Médecin';
   }
+  // Afficher "Changer de compte" uniquement en mode patient
+  if (btnCC) btnCC.style.display = role === 'patient' ? 'inline' : 'none';
 
   closeNotif();
   loadAll();
@@ -1296,8 +1338,8 @@ function retourPatient() {
 function retourAccueil() {
   medecinUnlocked = false;
   patientActifId = null;
-  localStorage.removeItem('patient_id');
-  localStorage.removeItem('patient_code');
+  deleteCookie('patient_id');
+  deleteCookie('patient_code');
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   document.getElementById('page-accueil').style.display = 'flex';
   document.getElementById('page-activation').style.display = 'none';
