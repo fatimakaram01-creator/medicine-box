@@ -1049,8 +1049,23 @@ def creer_profil(data: NouveauProfil):
         conn.commit()
         cursor.close()
         creer_alerte_systeme("contexte", f"Nouveau profil horaire créé : {data.label}")
-        # Regénérer les prises du jour avec les nouveaux intervalles
         _regenerer_prises_du_jour(conn_externe=None)
+        # Publier les nouveaux intervalles via MQTT → ESP32 les reçoit en temps réel
+        try:
+            from api.main import app as main_app
+            mqtt_client = getattr(main_app.state, 'mqtt_client', None)
+            if mqtt_client and mqtt_client.is_connected():
+                import json as json_mod
+                payload = json_mod.dumps({
+                    "action": "update_intervalles",
+                    "matin_debut": data.matin_debut, "matin_fin": data.matin_fin,
+                    "midi_debut":  data.midi_debut,  "midi_fin":  data.midi_fin,
+                    "soir_debut":  data.soir_debut,  "soir_fin":  data.soir_fin
+                })
+                mqtt_client.publish("medicinebox/commande", payload)
+                print(f"[MQTT] Intervalles publiés → ESP32")
+        except Exception as e:
+            print(f"[MQTT] Erreur publication intervalles : {e}")
         return {"success": True, "id": new_id}
     except Exception as e:
         return {"error": str(e)}
@@ -1095,8 +1110,35 @@ def activer_profil(profil_id: int):
         conn.commit()
         cursor.close()
         creer_alerte_systeme("contexte", f"Profil horaire réactivé : {label}")
-        # Regénérer les prises du jour avec les nouveaux intervalles
         _regenerer_prises_du_jour(conn_externe=None)
+        # Publier les nouveaux intervalles via MQTT → ESP32 les reçoit en temps réel
+        try:
+            from api.main import app as main_app
+            mqtt_client = getattr(main_app.state, 'mqtt_client', None)
+            if mqtt_client and mqtt_client.is_connected():
+                import json as json_mod
+                # Relire les intervalles du profil activé
+                conn2 = get_connection()
+                cur2 = conn2.cursor()
+                cur2.execute("""
+                    SELECT matin_debut::text, matin_fin::text,
+                           midi_debut::text, midi_fin::text,
+                           soir_debut::text, soir_fin::text
+                    FROM intervalles_profils WHERE id = %s;
+                """, (profil_id,))
+                r = cur2.fetchone()
+                cur2.close(); conn2.close()
+                if r:
+                    payload = json_mod.dumps({
+                        "action": "update_intervalles",
+                        "matin_debut": r[0], "matin_fin": r[1],
+                        "midi_debut":  r[2], "midi_fin":  r[3],
+                        "soir_debut":  r[4], "soir_fin":  r[5]
+                    })
+                    mqtt_client.publish("medicinebox/commande", payload)
+                    print(f"[MQTT] Intervalles publiés → ESP32")
+        except Exception as e:
+            print(f"[MQTT] Erreur publication intervalles : {e}")
         return {"success": True, "label": label}
     except Exception as e:
         return {"error": str(e)}
