@@ -1249,7 +1249,26 @@ async function activerPatient() {
   btn.disabled = false;
 }
 
-function changerCompte() {
+async function changerCompte() {
+  // Vérifier si la boîte est connectée
+  const pid = patientActifId;
+  const pidParam = pid ? `?patient_id=${pid}` : '';
+  let boiteConnectee = false;
+  try {
+    const status = await api(`/config/status${pidParam}`);
+    boiteConnectee = status && status.esp32_connected;
+  } catch(e) {}
+
+  if (!boiteConnectee) {
+    // Boîte non connectée → bloquer avec message
+    showToast('❌ Boîte non connectée — allumez et connectez la boîte avant de changer de compte.');
+    return;
+  }
+
+  // Boîte connectée → demander confirmation
+  const ok = confirm('Votre boîte est connectée ✅\n\nÊtes-vous sûr de vouloir changer de compte ?\nLa boîte sera mise à jour automatiquement.');
+  if (!ok) return;
+
   // Effacer le cookie → retour à l'écran de saisie code
   patientActifId = null;
   deleteCookie('patient_id');
