@@ -796,29 +796,16 @@ async function loadAll() {
     }
   }
 
-  // Mode patient → patientActifId UNIQUEMENT (connecté via code activation)
-  // Mode médecin → selectedPatientId UNIQUEMENT (sélectionné dans la grille)
-  // Jamais de fallback : chaque patient voit uniquement ses propres données
-  const pid = patientActifId
-    ? `?patient_id=${patientActifId}`
-    : selectedPatientId
-      ? `?patient_id=${selectedPatientId}`
-      : null;
-
-  // Si aucun patient identifié → afficher message et stopper les appels patient
-  if (!pid) {
-    const divRx = document.getElementById('hist-prescriptions');
-    if (divRx) divRx.innerHTML = '<div class="loading">Connectez-vous avec votre code activation pour voir vos prescriptions.</div>';
-    const divRxM = document.getElementById('med-hist-prescriptions');
-    if (divRxM) divRxM.innerHTML = '<div class="loading">Sélectionnez un patient.</div>';
-  }
+  // Mode patient → patientActifId, mode médecin → selectedPatientId (déjà set via patientsList[0])
+  const pidVal = patientActifId || selectedPatientId;
+  const pid = pidVal ? `?patient_id=${pidVal}` : '';
 
   const [patients, prises, alertes, observance, config] = await Promise.all([
     api('/patients'),
-    pid ? api(`/prises/today${pid}`) : Promise.resolve(null),
-    pid ? api(`/alertes${pid}`) : Promise.resolve(null),
-    pid ? api(`/observance${pid}`) : Promise.resolve(null),
-    pid ? api(`/config/status${pid}`) : Promise.resolve(null),
+    api(`/prises/today${pid}`),
+    api(`/alertes${pid}`),
+    api(`/observance${pid}`),
+    api(`/config/status${pid}`),
   ]);
 
   renderPatientPage(patients, prises, alertes, observance);
@@ -828,7 +815,7 @@ async function loadAll() {
   renderBanners(config);
   if (config) { renderConfig(config); renderMedecinStatus(config); }
 
-  const hist = pid ? await api(`/prises/historique${pid}`) : null;
+  const hist = await api(`/prises/historique${pid}`);
   if (hist) {
     renderHistPrises(hist);
     renderPatientPage(patients, prises, alertes, observance, hist);
@@ -845,15 +832,15 @@ async function loadAll() {
     renderProfilActifMedecin(profils);
   }
 
-  const rxHist = pid ? await api(`/prescriptions/historique${pid}`) : null;
+  const rxHist = await api(`/prescriptions/historique${pid}`);
   if (Array.isArray(rxHist)) renderHistPrescriptions(rxHist);
   else if (!pid) { /* déjà géré par le message connectez-vous */ }
   else renderHistPrescriptions([]);
 
   // Historique dans l'interface médecin (filtré par patient sélectionné)
-  const histMed = pid ? await api(`/prises/historique${pid}`) : null;
-  const alertesMed = pid ? await api(`/alertes${pid}`) : null;
-  const rxHistMed = pid ? await api(`/prescriptions/historique${pid}`) : null;
+  const histMed = await api(`/prises/historique${pid}`);
+  const alertesMed = await api(`/alertes${pid}`);
+  const rxHistMed = await api(`/prescriptions/historique${pid}`);
   renderHistMedecin(histMed, alertesMed, rxHistMed);
 
   const rx = await api(`/prescription/active${pid}`);
