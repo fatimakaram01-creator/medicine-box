@@ -1094,7 +1094,8 @@ async function toggleConfig(mode) {
   const btn = document.getElementById('toggle-' + mode);
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
-  const res = await api('/config/' + mode, { method: 'POST', body: JSON.stringify({ enabled }) });
+  const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
+  const res = await api(`/config/${mode}${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled }) });
   if (res) showToast(res.message);
 }
 
@@ -1103,16 +1104,17 @@ async function toggleRamadan() {
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
   document.getElementById('ramadan-ville-wrap').style.display = enabled ? 'block' : 'none';
+  const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
   if (enabled) {
     const sel = document.getElementById('ramadan-ville');
     sel.onchange = async () => {
       if (sel.value) {
-        const res = await api('/config/ramadan', { method: 'POST', body: JSON.stringify({ enabled: true, ville: sel.value }) });
+        const res = await api(`/config/ramadan${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled: true, ville: sel.value }) });
         if (res) showToast(res.message);
       }
     };
   } else {
-    const res = await api('/config/ramadan', { method: 'POST', body: JSON.stringify({ enabled: false }) });
+    const res = await api(`/config/ramadan${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled: false }) });
     if (res) showToast(res.message);
   }
 }
@@ -1122,16 +1124,17 @@ async function toggleHospitalisation() {
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
   document.getElementById('hospi-date-wrap').style.display = enabled ? 'block' : 'none';
+  const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
   if (enabled) {
     const input = document.getElementById('hospi-date');
     input.onchange = async () => {
       if (input.value) {
-        const res = await api('/config/hospitalisation', { method: 'POST', body: JSON.stringify({ enabled: true, date_retour: input.value }) });
+        const res = await api(`/config/hospitalisation${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled: true, date_retour: input.value }) });
         if (res) showToast(res.message);
       }
     };
   } else {
-    const res = await api('/config/hospitalisation', { method: 'POST', body: JSON.stringify({ enabled: false }) });
+    const res = await api(`/config/hospitalisation${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled: false }) });
     if (res) showToast(res.message);
   }
 }
@@ -1144,7 +1147,8 @@ async function changerRx() {
     prescrit_par: document.getElementById('rx-prescripteur').value,
     duree_jours: parseInt(document.getElementById('rx-duree').value)
   };
-  const res = await api('/config/changement-rx', { method: 'POST', body: JSON.stringify(data) });
+  const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
+  const res = await api(`/config/changement-rx${pidParam}`, { method: 'POST', body: JSON.stringify(data) });
   if (res) showToast(res.message || res.error);
 }
 
@@ -1197,7 +1201,8 @@ function renderPrescriptionMedecin(rx) {
 
 async function arreterTraitement() {
   if (!confirm('Confirmer l\'arrêt du traitement ? Le système sera mis en pause.')) return;
-  const res = await api('/config/arreter-traitement', { method: 'POST' });
+  const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
+  const res = await api(`/config/arreter-traitement${pidParam}`, { method: 'POST' });
   if (res?.status === 'ok') {
     showToast('⛔ ' + res.message);
     loadAll();
