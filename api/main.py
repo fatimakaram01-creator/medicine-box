@@ -421,89 +421,62 @@ async def tache_doses_manquees(mqtt_client):
 
 async def tache_generation_prises():
     """
-    Boucle infinie qui vérifie toutes les 30 minutes
-    si les prises du jour existent. Si non, les crée
-    selon le profil horaire actif.
+    Boucle infinie qui vérifie toutes les 30 minutes si les prises
+    du jour existent. Si non, les crée selon le profil horaire actif.
+    Uniquement si system_on=TRUE ET prescription active pour ce patient.
     """
-
-    # Attendre 3 secondes au démarrage pour que la BDD soit prête
     await asyncio.sleep(3)
     print("⏰ Tâche génération prises démarrée — vérification toutes les 30 min")
 
     while True:
         try:
-            # ── Vérifier que le système est ON ──
-            if not config_state.get("system_on", False):
-                await asyncio.sleep(1800)
-                continue
-
             if config_state.get("hospitalisation", False):
                 await asyncio.sleep(1800)
                 continue
 
             maintenant = datetime.now()
             aujourd_hui = maintenant.date()
-
-            # ── Lire le profil horaire actif depuis Supabase ──
-            # _get_moments_config() lit intervalles_profils WHERE actif=TRUE
-            # et calcule le milieu de chaque plage active.
-            # Les plages désactivées (00:00) sont ignorées.
-            # Fallback : 08:30 / 13:30 / 20:30 si aucun profil trouvé.
             moments_config = _get_moments_config()
 
             conn = get_connection()
             try:
                 cursor = conn.cursor()
-
-                # ── Multi-patients ──
                 cursor.execute("SELECT id FROM patients ORDER BY id;")
                 all_patients = cursor.fetchall()
-                if not all_patients:
-                    cursor.close()
-                    conn.close()
-                    await asyncio.sleep(1800)
-                    continue
-                for (patient_id,) in all_patients:
 
-                    # Récupérer la prescription active (la plus récente)
+                for (patient_id,) in all_patients:
+                    # ── Vérifier system_on par patient ──
+                    from api.routes import lire_system_on
+                    if not lire_system_on(patient_id):
+                        continue  # système OFF pour ce patient → pas de prises
+
+                    # ── Vérifier prescription active ──
                     cursor.execute("""
                         SELECT id FROM prescriptions
                         WHERE patient_id = %s
                           AND date_debut <= %s
                           AND date_fin >= %s
-                        ORDER BY id DESC
-                        LIMIT 1;
+                        ORDER BY id DESC LIMIT 1;
                     """, (patient_id, aujourd_hui, aujourd_hui))
-
                     row_presc = cursor.fetchone()
                     if not row_presc:
-                        cursor.close()
-                        conn.close()
-                        await asyncio.sleep(1800)
-                        continue
-                    prescription_id = row_presc[0]
+                        continue  # pas de prescription → pas de prises
 
-                    # ── Vérifier et créer les prises manquantes ──
+                    prescription_id = row_presc[0]
                     prises_creees = 0
 
                     for moment, heure_str in moments_config.items():
-                        # Vérifier si la prise existe déjà pour ce moment aujourd'hui
                         cursor.execute("""
                             SELECT id FROM prises
-                            WHERE patient_id = %s
-                              AND moment = %s
+                            WHERE patient_id = %s AND moment = %s
                               AND heure_prevue::date = %s;
                         """, (patient_id, moment, aujourd_hui))
-
                         if cursor.fetchone():
-                            continue  # déjà existante → pas de doublon
-
-                        # ── Créer la prise en_attente ──
+                            continue
                         heure_prevue = datetime.combine(
                             aujourd_hui,
                             datetime.strptime(heure_str, "%H:%M:%S").time()
                         )
-
                         cursor.execute("""
                             INSERT INTO prises (
                                 patient_id, prescription_id, moment,
@@ -511,14 +484,13 @@ async def tache_generation_prises():
                                 poids_avant, poids_apres
                             ) VALUES (%s, %s, %s, %s, NULL, 'en_attente', NULL, NULL);
                         """, (patient_id, prescription_id, moment, heure_prevue))
-
                         prises_creees += 1
 
                     if prises_creees > 0:
                         conn.commit()
-                        print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui} (profil actif)")
+                        print(f"📋 {prises_creees} prise(s) créée(s) pour patient_{patient_id} ({aujourd_hui})")
 
-                    cursor.close()
+                cursor.close()
             except Exception as e:
                 print(f"❌ Erreur tâche génération prises (BDD) : {e}")
             finally:

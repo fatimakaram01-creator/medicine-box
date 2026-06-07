@@ -1559,7 +1559,9 @@ function closeWifiGuide() { document.getElementById('wifi-guide-modal').classLis
 function closeWifiGuideOutside(e) { if (e.target === document.getElementById('wifi-guide-modal')) closeWifiGuide(); }
 
 async function toggleSystem(enabled) {
-  const res = await api('/config/system', { method: 'POST', body: JSON.stringify({ enabled }) });
+  const pid = patientActifId || selectedPatientId;
+  const pidParam = pid ? `?patient_id=${pid}` : '';
+  const res = await api(`/config/system${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled }) });
   if (res) {
     showToast(res.message);
     if (res.status === 'error') return;

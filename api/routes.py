@@ -44,38 +44,48 @@ class ChangementRx(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════
-# PERSISTANCE system_on dans Supabase
+# PERSISTANCE system_on dans Supabase — par patient
 # ═══════════════════════════════════════════════════════
 
-def lire_system_on():
-    """Lit system_on depuis la table config de Supabase au démarrage"""
+def lire_system_on(patient_id=None):
+    """Lit system_on depuis la table config — par patient si patient_id fourni"""
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("SELECT valeur FROM config WHERE cle='system_on';")
+        if patient_id:
+            cle = f'system_on_{patient_id}'
+        else:
+            cle = 'system_on'
+        cursor.execute("SELECT valeur FROM config WHERE cle=%s;", (cle,))
         row = cursor.fetchone()
         cursor.close()
-        valeur = row[0] == 'true' if row else False
-        print(f"📖 system_on lu depuis Supabase : {valeur}")
-        return valeur
+        if row:
+            return row[0] == 'true'
+        # Si pas de config spécifique → system OFF par défaut pour nouveau patient
+        return False
     except Exception as e:
         print(f"❌ Erreur lecture system_on : {e}")
         return False
     finally:
         conn.close()
 
-def sauvegarder_system_on(valeur: bool):
-    """Sauvegarde system_on dans la table config de Supabase"""
+def sauvegarder_system_on(valeur: bool, patient_id=None):
+    """Sauvegarde system_on dans la table config — par patient si patient_id fourni"""
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE config SET valeur=%s, updated_at=NOW() WHERE cle='system_on';",
-            ('true' if valeur else 'false',)
-        )
+        if patient_id:
+            cle = f'system_on_{patient_id}'
+        else:
+            cle = 'system_on'
+        cursor.execute("""
+            INSERT INTO config (cle, valeur, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (cle) DO UPDATE SET valeur=%s, updated_at=NOW();
+        """, (cle, 'true' if valeur else 'false', 'true' if valeur else 'false'))
         conn.commit()
         cursor.close()
-        print(f"💾 system_on sauvegardé dans Supabase : {valeur}")
+        print(f"💾 system_on[{patient_id}] sauvegardé : {valeur}")
     except Exception as e:
         print(f"❌ Erreur sauvegarde system_on : {e}")
     finally:
@@ -83,7 +93,7 @@ def sauvegarder_system_on(valeur: bool):
 
 
 config_state = {
-    "system_on": lire_system_on(),
+    "system_on": False,  # global — chaque patient a son propre system_on en base
     "esp32_connected": False,
     "remplissage": False,
     "buzzer": True,
@@ -358,7 +368,14 @@ def get_prises_historique(patient_id: int = None):
 
 @router.get("/config/status")
 def get_config_status(patient_id: int = None):
-    return config_state
+    state = dict(config_state)
+    # system_on est par patient — le lire depuis la base
+    if patient_id:
+        state["system_on"] = lire_system_on(patient_id)
+    else:
+        pid = get_patient_id_from_db(None)
+        state["system_on"] = lire_system_on(pid) if pid else False
+    return state
 
 
 @router.post("/config/remplissage")
@@ -423,15 +440,14 @@ def toggle_hospitalisation(body: ConfigHospitalisation, request: Request, patien
 @router.post("/config/system")
 def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
     mqtt_client = getattr(request.app.state, 'mqtt_client', None)
+    patient_id = get_patient_id_from_db(patient_id)
+    if not patient_id:
+        return {"status": "error", "message": "Aucun patient trouvé"}
 
     if body.enabled:
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            patient_id = get_patient_id_from_db(patient_id)
-            if not patient_id:
-                cursor.close()
-                return {"status": "error", "message": "Aucun patient trouvé"}
             cursor.execute("""
                 SELECT id FROM prescriptions
                 WHERE patient_id = %s AND date_debut <= CURRENT_DATE AND date_fin >= CURRENT_DATE
@@ -447,9 +463,8 @@ def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
         if not presc:
             return {"status": "error", "message": "Prescription expirée — contactez votre médecin"}
 
-        # Mettre à jour en mémoire ET dans Supabase
-        config_state["system_on"] = True
-        sauvegarder_system_on(True)
+        # Sauvegarder system_on par patient
+        sauvegarder_system_on(True, patient_id)
 
         # Générer les prises du jour selon le profil horaire actif
         aujourd_hui = datetime.now().date()
@@ -471,7 +486,7 @@ def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
                     prises_creees += 1
             if prises_creees > 0:
                 conn2.commit()
-                print(f"📋 {prises_creees} prise(s) créée(s) pour {aujourd_hui}")
+                print(f"📋 {prises_creees} prise(s) créée(s) pour patient_{patient_id}")
             cursor2.close()
         except Exception as e:
             print(f"❌ Erreur génération prises : {e}")
@@ -479,26 +494,23 @@ def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
             conn2.close()
 
         if mqtt_client and mqtt_client.is_connected():
-            mqtt_client.publish("medicinebox/config", json.dumps({"mode": "system_on", "enabled": True}))
+            mqtt_client.publish(f"medicinebox/config/{patient_id}", json.dumps({"mode": "system_on", "enabled": True}))
 
-        creer_alerte_systeme("systeme", "Système activé par le patient")
+        creer_alerte_systeme("systeme", f"Système activé — patient_{patient_id}")
         return {"status": "ok", "message": "Système activé — les alertes et le suivi reprennent"}
 
     else:
-        # Mettre à jour en mémoire ET dans Supabase
-        config_state["system_on"] = False
-        sauvegarder_system_on(False)
+        # Désactiver system_on pour ce patient
+        sauvegarder_system_on(False, patient_id)
 
         conn = get_connection()
         try:
             cursor = conn.cursor()
-            _pid2 = get_patient_id_from_db(None)
-            if _pid2:
-                cursor.execute("""
-                    DELETE FROM prises
-                    WHERE patient_id = %s AND heure_prevue::date = CURRENT_DATE AND statut = 'en_attente';
-                """, (_pid2,))
-                conn.commit()
+            cursor.execute("""
+                DELETE FROM prises
+                WHERE patient_id = %s AND heure_prevue::date = CURRENT_DATE AND statut = 'en_attente';
+            """, (patient_id,))
+            conn.commit()
             cursor.close()
         except Exception as e:
             print(f"❌ Erreur suppression prises : {e}")
@@ -506,9 +518,9 @@ def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
             conn.close()
 
         if mqtt_client and mqtt_client.is_connected():
-            mqtt_client.publish("medicinebox/config", json.dumps({"mode": "system_off", "enabled": False}))
+            mqtt_client.publish(f"medicinebox/config/{patient_id}", json.dumps({"mode": "system_off", "enabled": False}))
 
-        creer_alerte_systeme("systeme", "Système arrêté par le patient")
+        creer_alerte_systeme("systeme", f"Système arrêté — patient_{patient_id}")
         return {"status": "ok", "message": "Système arrêté"}
 
 
