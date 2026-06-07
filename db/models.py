@@ -11,11 +11,20 @@ def create_tables():
     # ──────────────────────────────────────────────────────────
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS patients (
-            id          SERIAL PRIMARY KEY,
-            nom         VARCHAR(100),
-            prenom      VARCHAR(100),
-            medecin     VARCHAR(100)
+            id              SERIAL PRIMARY KEY,
+            nom             VARCHAR(100),
+            prenom          VARCHAR(100),
+            medecin         VARCHAR(100),
+            code_activation VARCHAR(20) UNIQUE,
+            active          BOOLEAN DEFAULT TRUE
         );
+    """)
+    # Ajouter colonnes si absentes (migration safe)
+    cursor.execute("""
+        ALTER TABLE patients ADD COLUMN IF NOT EXISTS code_activation VARCHAR(20) UNIQUE;
+    """)
+    cursor.execute("""
+        ALTER TABLE patients ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
     """)
 
     # ──────────────────────────────────────────────────────────
@@ -236,12 +245,8 @@ def create_tables():
     """)
 
     # ── Valeurs par défaut dans config ──
-    # INSERT OR IGNORE : ne pas écraser si déjà présent
-    cursor.execute("""
-        INSERT INTO config (cle, valeur)
-        VALUES ('system_on', 'false')
-        ON CONFLICT (cle) DO NOTHING;
-    """)
+    # system_on est maintenant par patient : system_on_1, system_on_2, etc.
+    # Pas de valeur globale system_on
     cursor.execute("""
         INSERT INTO config (cle, valeur)
         VALUES ('intervalles_profil_actif_id', '1')
