@@ -1095,8 +1095,8 @@ function renderHistPrescriptions(prescriptions) {
       <div class="tl-row">
         <div class="tl-dot" style="background:${isActive ? 'var(--green-dot)' : isArretee ? 'var(--red-dot)' : 'var(--gray-dot)'}"></div>
         <div class="tl-info">
-          <div class="tl-name">💊 ${p.medicament} <span style="font-size:11px;color:var(--text-secondary);font-weight:400">${p.dosage}</span></div>
-          <div class="tl-sub">${p.nb_prises_jour} prise(s)/jour · ${p.medecin}</div>
+          <div class="tl-name">💊 ${p.medicaments || 'N/A'}</div>
+          <div class="tl-sub">${p.nb_doses} dose(s)/jour · ${p.medecin}</div>
           <div class="tl-sub" style="margin-top:2px">
             Du ${p.date_debut} → ${p.date_fin}
           </div>
@@ -1536,8 +1536,8 @@ function renderHistMedecin(hist, alertes, prescriptions) {
         <div class="tl-row">
           <div class="tl-dot" style="background:${isActive?'var(--green-dot)':isArretee?'var(--red-dot)':'var(--gray-dot)'}"></div>
           <div class="tl-info">
-            <div class="tl-name">💊 ${p.medicament} <span style="font-size:11px;color:var(--text-secondary)">${p.dosage}</span></div>
-            <div class="tl-sub">${p.nb_prises_jour} prise(s)/jour · ${p.medecin}</div>
+            <div class="tl-name">💊 ${p.medicaments || 'N/A'}</div>
+            <div class="tl-sub">${p.nb_doses} dose(s)/jour · ${p.medecin}</div>
             <div class="tl-sub" style="margin-top:2px">Du ${p.date_debut} → ${p.date_fin} · ${duree} jour(s)</div>
           </div>
           <div class="tl-right">${pillHtml}</div>
