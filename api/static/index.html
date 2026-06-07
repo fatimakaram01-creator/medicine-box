@@ -1045,7 +1045,8 @@ function renderMedecinPage(patients, prises, alertes, observance) {
   `;
 
   if (Array.isArray(alertes)) {
-    document.getElementById('medecin-alertes').innerHTML = alertes.slice(0, 5).map(a => {
+    const divA = document.getElementById('medecin-alertes');
+    if (divA) divA.innerHTML = alertes.slice(0, 5).map(a => {
       const pillCls = a.type === 'dose_manquee' ? 'pill-warn' : a.type === 'erreur_dispositif' ? 'pill-danger' : 'pill-info';
       return `<div class="hist-row"><div class="hist-time">${formatHeure(a.created_at)}</div><div class="hist-desc">${a.message}</div><span class="pill ${pillCls}">${a.type.replace('_', ' ')}</span></div>`;
     }).join('') || '<div class="loading">Aucune alerte</div>';
