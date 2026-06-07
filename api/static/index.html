@@ -798,9 +798,10 @@ async function loadAll() {
 
   // En mode patient → utiliser patientActifId (connecté via code activation)
   // En mode médecin → utiliser selectedPatientId (sélectionné dans la grille)
-  const pidPatient = patientActifId ? `?patient_id=${patientActifId}` : '';
-  const pidMedecin = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
-  const pid = patientActifId ? pidPatient : pidMedecin;
+  // Fallback : premier patient de la liste si aucun des deux n'est défini
+  const pidResolu = patientActifId || selectedPatientId
+    || (patientsList && patientsList.length > 0 ? patientsList[0].id : null);
+  const pid = pidResolu ? `?patient_id=${pidResolu}` : '';
   const [patients, prises, alertes, observance, config] = await Promise.all([
     api('/patients'),
     api(`/prises/today${pid}`),
