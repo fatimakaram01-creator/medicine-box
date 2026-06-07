@@ -898,9 +898,8 @@ def get_prescriptions_historique(patient_id: int = None):
             "date_debut": r[2],
             "date_fin": r[3],
             "active": r[4],
-            "medicament": r[5] or "—",
-            "dosage": "",
-            "nb_prises_jour": r[6],
+            "medicaments": r[5] or "—",
+            "nb_doses": r[6],
             "duree_jours": r[7].days if r[7] else 0
         } for r in rows]
     except Exception as e:
