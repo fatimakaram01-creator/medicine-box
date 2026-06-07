@@ -900,7 +900,7 @@ def get_prescriptions_historique(patient_id: int = None):
             "active": r[4],
             "medicaments": r[5] or "—",
             "nb_doses": r[6],
-            "duree_jours": r[7].days if r[7] else 0
+            "duree_jours": int(r[7]) if r[7] else 0
         } for r in rows]
     except Exception as e:
         return {"error": str(e)}
