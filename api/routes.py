@@ -641,7 +641,7 @@ def changement_rx(body: ChangementRx, patient_id: int = None):
 
         conn.commit()
         cursor.close()
-        creer_alerte_systeme("contexte", f"{'Nouveau médicament ajouté' if mode == 'nouveau' else 'Prescription modifiée'} : {body.medicament} × {body.frequence}/jour")
+        # Pas d'alerte système — l'historique prescriptions suffit
 
         # Notifier l'ESP32 via MQTT — prescription créée pour ce patient
         try:
@@ -721,7 +721,7 @@ def arreter_traitement(patient_id: int = None):
         except Exception as e:
             print(f"[MQTT] Erreur : {e}")
 
-        creer_alerte_systeme("contexte", "Traitement arrêté par le médecin")
+        # Pas d'alerte système — l'historique prescriptions suffit
         return {"status": "ok", "message": "Traitement arrêté — le système est mis en pause"}
     except Exception as e:
         return {"error": str(e)}
