@@ -1462,8 +1462,11 @@ function renderHistMedecin(hist, alertes, prescriptions) {
 }
 
 function switchSubTab(id, el) {
-  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
+  const page = document.getElementById('page-historique') || el.closest('.page');
+  if (page) {
+    page.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+    page.querySelectorAll('.sub-page').forEach(p => p.classList.remove('active'));
+  }
   el.classList.add('active');
   document.getElementById('sub-' + id).classList.add('active');
 }
