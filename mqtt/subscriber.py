@@ -210,13 +210,60 @@ def handle_statut(data):
     # ── Erreur hardware ──
     # ── Offline — ESP32 déconnecté (LWT) ──
     elif status == "offline":
-        from api.routes import config_state
+        from api.routes import config_state, sauvegarder_system_on
         config_state["esp32_connected"] = False
         print("🔴 ESP32 déconnecté (LWT)")
 
+        # Récupérer le patient_id depuis le message si présent
+        patient_id = data.get("patient_id", None)
+
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+
+            # Si pas de patient_id dans le message → chercher tous les patients actifs
+            if patient_id:
+                patients = [patient_id]
+            else:
+                cursor.execute("SELECT id FROM patients WHERE active = TRUE ORDER BY id;")
+                patients = [r[0] for r in cursor.fetchall()]
+
+            for pid in patients:
+                # Mettre system_on = False pour ce patient
+                sauvegarder_system_on(False, pid)
+                print(f"💾 system_on[{pid}] → False (boîte éteinte)")
+
+                # Marquer les prises en_attente des jours passés comme 'manque'
+                cursor.execute("""
+                    UPDATE prises SET statut = 'manque'
+                    WHERE patient_id = %s
+                      AND statut = 'en_attente'
+                      AND heure_prevue::date < CURRENT_DATE;
+                """, (pid,))
+                nb_manque = cursor.rowcount
+
+                # Supprimer les prises en_attente futures d'aujourd'hui
+                cursor.execute("""
+                    DELETE FROM prises
+                    WHERE patient_id = %s
+                      AND statut = 'en_attente'
+                      AND heure_prevue > NOW();
+                """, (pid,))
+                nb_sup = cursor.rowcount
+
+                conn.commit()
+                if nb_manque > 0 or nb_sup > 0:
+                    print(f"📋 patient_{pid} : {nb_manque} prise(s) → manque, {nb_sup} future(s) supprimée(s)")
+
+            cursor.close()
+        except Exception as e:
+            print(f"❌ Erreur offline handler : {e}")
+        finally:
+            conn.close()
+
         try:
             from api.routes import creer_alerte_systeme
-            creer_alerte_systeme("systeme", "Boîte déconnectée")
+            creer_alerte_systeme("systeme", "Boîte déconnectée — système mis en pause automatiquement")
         except Exception:
             pass
     elif status == "error":
