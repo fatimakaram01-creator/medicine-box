@@ -465,11 +465,40 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
   <div class="new-patient-form" id="new-patient-form">
     <div class="section-label">Nouveau patient</div>
     <div class="input-wrap" style="margin-top:0">
-      <input type="text" id="np-prenom" placeholder="Prénom">
-      <input type="text" id="np-nom" placeholder="Nom">
-      <input type="text" id="np-medecin" placeholder="Médecin référent (ex: Dr. Saidi)">
-      <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn btn-primary" onclick="creerPatient()" style="flex:1">Créer le patient</button>
+
+      <!-- Toggle nouveau / existant -->
+      <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:10px">
+        <button id="btn-nouveau-patient" onclick="toggleModePatient('nouveau')"
+          style="flex:1;padding:8px;font-size:12px;font-weight:500;background:var(--teal);color:#fff;border:none;cursor:pointer">
+          ➕ Nouveau patient
+        </button>
+        <button id="btn-patient-existant" onclick="toggleModePatient('existant')"
+          style="flex:1;padding:8px;font-size:12px;font-weight:500;background:var(--bg);color:var(--text-secondary);border:none;cursor:pointer">
+          🔑 Patient existant
+        </button>
+      </div>
+
+      <!-- Mode nouveau patient -->
+      <div id="form-nouveau-patient">
+        <input type="text" id="np-prenom" placeholder="Prénom">
+        <input type="text" id="np-nom" placeholder="Nom">
+        <input type="text" id="np-medecin" placeholder="Médecin référent (ex: Dr. Saidi)">
+      </div>
+
+      <!-- Mode patient existant -->
+      <div id="form-patient-existant" style="display:none">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">
+          Le patient a déjà un compte sur une autre boîte ou un autre médecin.
+          Entrez son code d'activation pour l'associer à votre compte.
+        </div>
+        <input type="text" id="np-code-existant" placeholder="Code d'activation (MB-YYYY-XXXX)"
+          style="font-family:monospace;letter-spacing:2px"
+          oninput="this.value=this.value.toUpperCase()">
+        <input type="text" id="np-medecin-existant" placeholder="Votre nom (médecin référent)">
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary" onclick="creerPatient()" style="flex:1">Confirmer</button>
         <button class="btn" onclick="fermerFormulairePatient()" style="flex:1">Annuler</button>
       </div>
     </div>
@@ -1700,6 +1729,7 @@ function selectionnerPatient(id, nom) {
 
 function ouvrirFormulairePatient() {
   document.getElementById('new-patient-form').classList.add('open');
+  toggleModePatient('nouveau');
 }
 
 function fermerFormulairePatient() {
@@ -1707,25 +1737,58 @@ function fermerFormulairePatient() {
   document.getElementById('np-prenom').value = '';
   document.getElementById('np-nom').value = '';
   document.getElementById('np-medecin').value = '';
+  document.getElementById('np-code-existant').value = '';
+  document.getElementById('np-medecin-existant').value = '';
+}
+
+function toggleModePatient(mode) {
+  const isNouveau = mode === 'nouveau';
+  document.getElementById('form-nouveau-patient').style.display = isNouveau ? 'block' : 'none';
+  document.getElementById('form-patient-existant').style.display = isNouveau ? 'none' : 'block';
+  document.getElementById('btn-nouveau-patient').style.background = isNouveau ? 'var(--teal)' : 'var(--bg)';
+  document.getElementById('btn-nouveau-patient').style.color = isNouveau ? '#fff' : 'var(--text-secondary)';
+  document.getElementById('btn-patient-existant').style.background = isNouveau ? 'var(--bg)' : 'var(--teal)';
+  document.getElementById('btn-patient-existant').style.color = isNouveau ? 'var(--text-secondary)' : '#fff';
 }
 
 async function creerPatient() {
-  const prenom = document.getElementById('np-prenom').value.trim();
-  const nom = document.getElementById('np-nom').value.trim();
-  const medecin = document.getElementById('np-medecin').value.trim();
-  if (!prenom || !nom) { showToast('Prénom et nom obligatoires'); return; }
-  const res = await api('/patients/creer', {
-    method: 'POST',
-    body: JSON.stringify({ prenom, nom, medecin })
-  });
-  if (res?.success) {
-    fermerFormulairePatient();
-    selectedPatientId = res.patient_id;
-    // Afficher le code d'activation dans une alerte visuelle
-    afficherCodeActivation(prenom, nom, res.code_activation);
-    loadAll();
+  const modeExistant = document.getElementById('form-patient-existant').style.display !== 'none';
+
+  if (modeExistant) {
+    // Patient existant — via code activation
+    const code = document.getElementById('np-code-existant').value.trim().toUpperCase();
+    const medecin = document.getElementById('np-medecin-existant').value.trim();
+    if (!code) { showToast('Code d\'activation obligatoire'); return; }
+    const res = await api('/patients/creer', {
+      method: 'POST',
+      body: JSON.stringify({ code_activation_existant: code, medecin })
+    });
+    if (res?.success) {
+      fermerFormulairePatient();
+      selectedPatientId = res.patient_id;
+      showToast(`✅ ${res.message}`);
+      loadAll();
+    } else {
+      showToast('Erreur : ' + (res?.error || 'inconnue'));
+    }
   } else {
-    showToast('Erreur : ' + (res?.error || 'inconnue'));
+    // Nouveau patient
+    const prenom = document.getElementById('np-prenom').value.trim();
+    const nom = document.getElementById('np-nom').value.trim();
+    const medecin = document.getElementById('np-medecin').value.trim();
+    if (!prenom || !nom) { showToast('Prénom et nom obligatoires'); return; }
+    const res = await api('/patients/creer', {
+      method: 'POST',
+      body: JSON.stringify({ prenom, nom, medecin })
+    });
+    if (res?.success) {
+      fermerFormulairePatient();
+      selectedPatientId = res.patient_id;
+      afficherCodeActivation(prenom, nom, res.code_activation);
+      loadAll();
+    } else {
+      showToast('Erreur : ' + (res?.error || 'inconnue'));
+    }
   }
 }
 

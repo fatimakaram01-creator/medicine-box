@@ -138,29 +138,61 @@ def liste_patients():
 
 @router.post("/patients/creer")
 def creer_patient(body: dict):
-    """Crée un nouveau patient et génère un code d'activation unique"""
+    """
+    Crée un nouveau patient OU ajoute un médecin à un patient existant.
+    Si code_activation fourni → cherche le patient existant et ajoute le médecin.
+    Sinon → crée un nouveau patient avec un code généré.
+    """
     import random
-    import string
     from datetime import datetime
 
     conn = get_connection()
     try:
         cursor = conn.cursor()
 
-        # Générer un code unique : MB-YYYY-XXXX (ex: MB-2026-0047)
+        code_existant = body.get("code_activation_existant", "").strip().upper()
+        medecin = body.get("medecin", "")
+
+        # ── Cas 1 : Patient existant — ajouter ce médecin ──
+        if code_existant:
+            cursor.execute("""
+                SELECT id, prenom, nom, medecin FROM patients
+                WHERE code_activation = %s;
+            """, (code_existant,))
+            row = cursor.fetchone()
+            if not row:
+                cursor.close()
+                return {"error": "Code d'activation introuvable — vérifiez le code du patient"}
+            patient_id = row[0]
+            # Mettre à jour le médecin référent si différent
+            if medecin and medecin != row[3]:
+                cursor.execute("""
+                    UPDATE patients SET medecin = %s WHERE id = %s;
+                """, (medecin, patient_id))
+                conn.commit()
+            cursor.close()
+            return {
+                "success": True,
+                "patient_id": patient_id,
+                "code_activation": code_existant,
+                "prenom": row[1],
+                "nom": row[2],
+                "message": f"Patient {row[1]} {row[2]} associé à votre compte"
+            }
+
+        # ── Cas 2 : Nouveau patient ──
         annee = datetime.now().year
         while True:
             numero = random.randint(1, 9999)
             code = f"MB-{annee}-{numero:04d}"
-            # Vérifier unicité
             cursor.execute("SELECT id FROM patients WHERE code_activation = %s;", (code,))
             if not cursor.fetchone():
-                break  # code unique trouvé
+                break
 
         cursor.execute("""
             INSERT INTO patients (nom, prenom, medecin, code_activation)
             VALUES (%s, %s, %s, %s) RETURNING id;
-        """, (body.get("nom",""), body.get("prenom",""), body.get("medecin",""), code))
+        """, (body.get("nom",""), body.get("prenom",""), medecin, code))
         new_id = cursor.fetchone()[0]
         conn.commit()
         cursor.close()
@@ -843,7 +875,7 @@ def get_profil_actif():
 
 @router.get("/prescriptions/historique")
 def get_prescriptions_historique(patient_id: int = None):
-    """Retourne toutes les prescriptions du patient avec durée d'activation"""
+    """Retourne toutes les prescriptions du patient avec leurs médicaments groupés"""
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -851,17 +883,18 @@ def get_prescriptions_historique(patient_id: int = None):
         if not patient_id:
             cursor.close()
             return []
+        # Récupérer toutes les prescriptions avec leurs médicaments groupés
         cursor.execute("""
             SELECT p.id, p.medecin, p.date_debut::text, p.date_fin::text,
-                   p.active, m.nom, m.dosage,
-                   COUNT(pd.id) as nb_prises_jour,
+                   p.active,
+                   STRING_AGG(DISTINCT m.nom || ' ' || COALESCE(m.dosage,''), ', ') as medicaments,
+                   COUNT(DISTINCT pd.id) as nb_doses,
                    (p.date_fin - p.date_debut) as duree_jours
             FROM prescriptions p
             LEFT JOIN prescription_doses pd ON pd.prescription_id = p.id
             LEFT JOIN medicaments m ON m.id = pd.medicament_id
             WHERE p.patient_id = %s
-            GROUP BY p.id, p.medecin, p.date_debut, p.date_fin,
-                     p.active, m.nom, m.dosage
+            GROUP BY p.id, p.medecin, p.date_debut, p.date_fin, p.active
             ORDER BY p.date_debut DESC;
         """, (patient_id,))
         rows = cursor.fetchall()
@@ -873,9 +906,9 @@ def get_prescriptions_historique(patient_id: int = None):
             "date_fin": r[3],
             "active": r[4],
             "medicament": r[5] or "—",
-            "dosage": r[6] or "—",
-            "nb_prises_jour": r[7],
-            "duree_jours": r[8].days if r[8] else 0
+            "dosage": "",
+            "nb_prises_jour": r[6],
+            "duree_jours": r[7].days if r[7] else 0
         } for r in rows]
     except Exception as e:
         return {"error": str(e)}
