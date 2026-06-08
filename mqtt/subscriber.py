@@ -325,30 +325,113 @@ def handle_statut(data):
 
 
 # ─── Handler : mode sans WiFi ───
-# Message depuis l'app (route POST /mode-sans-wifi) republié en MQTT
 # {"status": "sans_wifi", "patient_id": 1, "actif": true/false}
+# actif=true  → patient part sans WiFi → conserver prises futures
+# actif=false → retour WiFi après absence → recréer prises manquantes + désactiver
 def handle_mode(data):
     patient_id = data.get("patient_id")
     actif = data.get("actif", False)
     status = data.get("status", "")
 
-    if status == "sans_wifi" and patient_id:
-        conn = get_connection()
-        try:
-            cursor = conn.cursor()
-            valeur = 'true' if actif else 'false'
+    if status != "sans_wifi" or not patient_id:
+        return
+
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        valeur = 'true' if actif else 'false'
+
+        # Mettre à jour le flag en base
+        cursor.execute("""
+            INSERT INTO config (cle, valeur, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (cle) DO UPDATE SET valeur = %s, updated_at = NOW();
+        """, (f'mode_sans_wifi_{patient_id}', valeur, valeur))
+        conn.commit()
+        print(f"📶 mode_sans_wifi patient_{patient_id} → {valeur}")
+
+        # ── Si désactivation (retour WiFi) → recréer les prises manquantes ──
+        # Le patient était absent avec la boîte — les prises ont été supprimées
+        # On les recrée depuis la prescription active pour la période manquante
+        if not actif:
+            recreer_prises_absence(cursor, conn, patient_id)
+
+        cursor.close()
+    except Exception as e:
+        print(f"❌ Erreur handle_mode : {e}")
+    finally:
+        conn.close()
+
+
+def recreer_prises_absence(cursor, conn, patient_id):
+    """
+    Recrée les prises manquantes depuis la prescription active.
+    Appelée au retour WiFi après mode sans_wifi.
+    Ne recrée que les prises qui n'existent pas encore.
+    """
+    from datetime import date, timedelta
+
+    # Récupérer prescription active
+    cursor.execute("""
+        SELECT id FROM prescriptions
+        WHERE patient_id = %s AND active = TRUE
+          AND date_debut <= CURRENT_DATE AND date_fin >= CURRENT_DATE
+        ORDER BY id DESC LIMIT 1;
+    """, (patient_id,))
+    presc = cursor.fetchone()
+    if not presc:
+        print(f"⚠️ Aucune prescription active pour patient_{patient_id} — pas de recréation")
+        return
+
+    prescription_id = presc[0]
+
+    # Récupérer les moments et heures du profil actif
+    cursor.execute("""
+        SELECT
+            CASE WHEN matin_debut != matin_fin
+                THEN to_char((matin_debut + (matin_fin - matin_debut)/2), 'HH24:MI') END AS matin,
+            CASE WHEN midi_debut != midi_fin
+                THEN to_char((midi_debut + (midi_fin - midi_debut)/2), 'HH24:MI') END AS midi,
+            CASE WHEN soir_debut != soir_fin
+                THEN to_char((soir_debut + (soir_fin - soir_debut)/2), 'HH24:MI') END AS soir
+        FROM intervalles_profils WHERE actif = TRUE LIMIT 1;
+    """)
+    profil = cursor.fetchone()
+    if not profil:
+        return
+
+    moments = {}
+    for i, m in enumerate(['matin', 'midi', 'soir']):
+        if profil[i]:
+            moments[m] = profil[i]
+
+    # Recréer les prises manquantes des 7 derniers jours
+    aujourd_hui = date.today()
+    nb_recrees = 0
+    for j in range(7, -1, -1):
+        jour = aujourd_hui - timedelta(days=j)
+        for moment, heure_str in moments.items():
+            # Vérifier si la prise existe déjà
             cursor.execute("""
-                INSERT INTO config (cle, valeur, updated_at)
-                VALUES (%s, %s, NOW())
-                ON CONFLICT (cle) DO UPDATE SET valeur = %s, updated_at = NOW();
-            """, (f'mode_sans_wifi_{patient_id}', valeur, valeur))
-            conn.commit()
-            cursor.close()
-            print(f"📶 mode_sans_wifi patient_{patient_id} → {valeur}")
-        except Exception as e:
-            print(f"❌ Erreur handle_mode : {e}")
-        finally:
-            conn.close()
+                SELECT id FROM prises
+                WHERE patient_id = %s AND moment = %s AND heure_prevue::date = %s;
+            """, (patient_id, moment, jour))
+            if not cursor.fetchone():
+                from datetime import datetime
+                heure_prevue = datetime.combine(jour, datetime.strptime(heure_str, "%H:%M").time())
+                # Prise passée → statut manque (le patient avait ses médicaments manuellement)
+                # Prise aujourd'hui → en_attente
+                statut = 'en_attente' if jour == aujourd_hui else 'manque'
+                cursor.execute("""
+                    INSERT INTO prises (patient_id, prescription_id, moment, heure_prevue, statut, cause_manque)
+                    VALUES (%s, %s, %s, %s, %s, %s);
+                """, (patient_id, prescription_id, moment, heure_prevue, statut,
+                        None if statut == 'en_attente' else 'sans_wifi'))
+                nb_recrees += 1
+
+    if nb_recrees > 0:
+        conn.commit()
+        print(f"✅ patient_{patient_id} : {nb_recrees} prise(s) recrée(s) après retour WiFi")
 
 
 def verifier_donnees_reconnexion():

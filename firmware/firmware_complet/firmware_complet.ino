@@ -118,6 +118,7 @@ bool mqttConnecte     = false;
 bool etaitConnecte    = false;
 bool dernierEtatEnLigne = true;
 bool systemActif      = false;  // false par défaut — activé par le backend via MQTT
+bool modeSansWifi     = false;  // true → ESP32 stocke prises EEPROM si offline
 
 int sIdx = 0;
 int positionCourante = -1;
@@ -398,12 +399,71 @@ void chargerSystemActif() {
   int code = http.GET();
   if (code == 200) {
     String body = http.getString();
-    // Parser system_on avec ou sans espace : "system_on":true ou "system_on": true
     systemActif = body.indexOf("\"system_on\":true") >= 0 ||
                   body.indexOf("\"system_on\": true") >= 0;
+    // Charger aussi mode_sans_wifi
+    modeSansWifi = body.indexOf("\"mode_sans_wifi\":true") >= 0 ||
+                   body.indexOf("\"mode_sans_wifi\": true") >= 0;
     Serial.println("[System] system_on = " + String(systemActif ? "true" : "false"));
+    Serial.println("[System] mode_sans_wifi = " + String(modeSansWifi ? "true" : "false"));
   }
   http.end();
+}
+
+// ─── Toggle mode sans WiFi ───
+// Appui long BTN_PREV (>2s) hors mode remplissage
+void toggleModeSansWifi() {
+  modeSansWifi = !modeSansWifi;
+
+  // ── Sauvegarder en NVS → survit au redémarrage et à l'offline ──
+  prefs.begin("patient", false);
+  prefs.putBool("sans_wifi", modeSansWifi);
+  prefs.end();
+
+  // ── Publier sur MQTT si connecté ──
+  // Si pas connecté → sera publié au retour WiFi dans maintienMQTT()
+  if (mqtt.connected()) {
+    StaticJsonDocument<128> doc;
+    doc["status"]     = "sans_wifi";
+    doc["patient_id"] = PATIENT_ID;
+    doc["actif"]      = modeSansWifi;
+    String payload;
+    serializeJson(doc, payload);
+    mqtt.publish("medicinebox/mode", payload.c_str());
+  }
+
+  Serial.println(modeSansWifi ? "[Mode] Sans WiFi ACTIVE" : "[Mode] Sans WiFi DESACTIVE");
+  display.clearDisplay();
+  display.setTextSize(1); display.setTextColor(SSD1306_WHITE);
+  display.setCursor(5, 15);
+  display.println(modeSansWifi ? "Je pars sans WiFi" : "Mode normal");
+  display.setCursor(5, 30);
+  display.println(modeSansWifi ? "Prises conservees" : "Mode desactive");
+  display.setCursor(5, 45);
+  display.println(modeSansWifi ? "Bon voyage!" : "OK");
+  display.display();
+  delay(2500);
+}
+
+// ─── Charger modeSansWifi depuis NVS au démarrage ───
+void chargerModeSansWifi() {
+  prefs.begin("patient", true);
+  modeSansWifi = prefs.getBool("sans_wifi", false);
+  prefs.end();
+  Serial.println("[NVS] mode_sans_wifi = " + String(modeSansWifi ? "true" : "false"));
+}
+
+// ─── Publier mode_sans_wifi au retour WiFi ───
+void publierModeSansWifiSiActif() {
+  if (!modeSansWifi) return;
+  StaticJsonDocument<128> doc;
+  doc["status"]     = "sans_wifi";
+  doc["patient_id"] = PATIENT_ID;
+  doc["actif"]      = true;
+  String payload;
+  serializeJson(doc, payload);
+  mqtt.publish("medicinebox/mode", payload.c_str());
+  Serial.println("[Mode] Publié sans_wifi actif au retour WiFi");
 }
 
 void chargerIntervalles() {
@@ -719,8 +779,10 @@ bool connecterMQTT() {
   // Construire les topics dynamiques pour ce patient
   TOPIC_ALERTE = "medicinebox/alerte/" + String(PATIENT_ID);
   TOPIC_CONFIG = "medicinebox/config/" + String(PATIENT_ID);
+  // LWT inclut patient_id pour que le backend sache quel patient est offline
+  String lwtPayload = "{\"status\":\"offline\",\"patient_id\":" + String(PATIENT_ID) + "}";
   if (mqtt.connect("medicinebox-esp32", MQTT_USER, MQTT_PASS,
-                    TOPIC_STATUT, 1, true, "{\"status\":\"offline\"}")) {
+                    TOPIC_STATUT, 1, true, lwtPayload.c_str())) {
     mqtt.subscribe(TOPIC_ALERTE.c_str());
     mqtt.subscribe(TOPIC_CONFIG.c_str());
     mqtt.subscribe(TOPIC_COMMANDE);
@@ -737,7 +799,22 @@ void maintienMQTT() {
     etaitConnecte=false;
     if (connecterMQTT()) {
       publierStatut("online","Reconnexion");
+      // Si mode_sans_wifi actif → informer backend avant sync EEPROM
+      publierModeSansWifiSiActif();
+      delay(500);
       viderBufferSPIFFS();
+      // Désactiver mode_sans_wifi après sync
+      if (modeSansWifi) {
+        modeSansWifi = false;
+        prefs.begin("patient", false);
+        prefs.putBool("sans_wifi", false);
+        prefs.end();
+        StaticJsonDocument<128> doc;
+        doc["status"] = "sans_wifi"; doc["patient_id"] = PATIENT_ID; doc["actif"] = false;
+        String p; serializeJson(doc, p);
+        mqtt.publish("medicinebox/mode", p.c_str());
+        Serial.println("[Mode] Sans WiFi désactivé après sync");
+      }
       etaitConnecte=true;
     }
   } else {
@@ -1066,9 +1143,25 @@ void setup() {
       chargerIntervalles();  // ← charger les plages horaires depuis le backend
       // Charger l'état system_on depuis le backend
       chargerSystemActif();
+      chargerModeSansWifi();  // ← charger depuis NVS (survit à l'offline)
       if (connecterMQTT()) {
         publierStatut("online","Demarrage OK");
+        // Si mode_sans_wifi était actif → informer le backend avant de vider l'EEPROM
+        publierModeSansWifiSiActif();
+        delay(500);  // laisser le backend traiter avant sync EEPROM
         viderBufferSPIFFS();
+        // Désactiver mode_sans_wifi après sync
+        if (modeSansWifi) {
+          modeSansWifi = false;
+          prefs.begin("patient", false);
+          prefs.putBool("sans_wifi", false);
+          prefs.end();
+          StaticJsonDocument<128> doc;
+          doc["status"] = "sans_wifi"; doc["patient_id"] = PATIENT_ID; doc["actif"] = false;
+          String p; serializeJson(doc, p);
+          mqtt.publish("medicinebox/mode", p.c_str());
+          Serial.println("[Mode] Sans WiFi désactivé après sync");
+        }
       }
     } else {
       effacerWiFi();
@@ -1136,6 +1229,22 @@ void loop() {
       int t=0;
       while (WiFi.status()!=WL_CONNECTED && t<10) { delay(500); t++; }
       if (WiFi.status()==WL_CONNECTED) forcerReposOLED();
+    }
+  }
+
+  // ── Appui long BTN_PREV (>2s) hors remplissage → toggle mode sans WiFi ──
+  if (!modeRemplissage) {
+    static unsigned long btnPrevPressedAt = 0;
+    static bool btnPrevWasPressed = false;
+    bool btnPrevNow = (digitalRead(BTN_PREV_PIN) == LOW);
+    if (btnPrevNow && !btnPrevWasPressed) {
+      btnPrevPressedAt = millis();
+      btnPrevWasPressed = true;
+    } else if (!btnPrevNow && btnPrevWasPressed) {
+      if (millis() - btnPrevPressedAt >= 2000) {
+        toggleModeSansWifi();
+      }
+      btnPrevWasPressed = false;
     }
   }
 
