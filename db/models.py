@@ -27,6 +27,14 @@ def create_tables():
         ALTER TABLE patients ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT TRUE;
     """)
 
+    # Migrations safe pour nouvelles colonnes
+    cursor.execute("""
+        ALTER TABLE prises ADD COLUMN IF NOT EXISTS cause_manque VARCHAR(20) DEFAULT NULL;
+    """)
+    cursor.execute("""
+        ALTER TABLE alertes_optimisation ADD COLUMN IF NOT EXISTS profil_id INT REFERENCES intervalles_profils(id) DEFAULT NULL;
+    """)
+
     # ──────────────────────────────────────────────────────────
     # TABLE : medicaments
     # Catalogue des médicaments disponibles
@@ -156,6 +164,7 @@ def create_tables():
             statut          VARCHAR(20),
             poids_avant     FLOAT,
             poids_apres     FLOAT,
+            cause_manque    VARCHAR(20) DEFAULT NULL,
             created_at      TIMESTAMP DEFAULT NOW()
         );
     """)
@@ -214,6 +223,7 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS alertes_optimisation (
             id                          SERIAL PRIMARY KEY,
             patient_id                  INT REFERENCES patients(id),
+            profil_id                   INT REFERENCES intervalles_profils(id) DEFAULT NULL,
             moment                      VARCHAR(20),
             heure_alerte                TIME,
             jour_semaine                INT,
@@ -257,6 +267,8 @@ def create_tables():
         VALUES ('intervalles_modifies_le', CURRENT_DATE::TEXT)
         ON CONFLICT (cle) DO NOTHING;
     """)
+    # mode_sans_wifi par patient : mode_sans_wifi_{id} → 'true'/'false'
+    # Géré dynamiquement comme system_on_{id}, pas de valeur par défaut globale
 
     # ── Profil horaire par défaut ──
     # Inséré seulement si intervalles_profils est vide

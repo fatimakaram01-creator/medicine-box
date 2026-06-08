@@ -1,0 +1,30 @@
+{
+  "patient_id": 1,
+  "prenom": "Fatima",
+  "nom": "Benmoussa",
+  "trained_at": "2026-06-06T03:13:58.188653",
+  "n_samples": 270,
+  "features": [
+    "heure_alerte_min",
+    "jour_semaine",
+    "moment_enc",
+    "phase_enc",
+    "is_weekend",
+    "heure_norm"
+  ],
+  "moment_classes": [
+    "matin",
+    "midi",
+    "soir"
+  ],
+  "phase_classes": [
+    "adapte",
+    "decouverte"
+  ],
+  "stats": {
+    "heure_alerte_mean": 850.1148148148148,
+    "heure_alerte_std": 292.85831128042975,
+    "delai_mean": 58.625,
+    "alerte_efficace_rate": 0.3962962962962963
+  }
+}

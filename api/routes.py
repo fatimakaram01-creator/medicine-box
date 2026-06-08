@@ -414,12 +414,24 @@ def get_prises_historique(patient_id: int = None):
 @router.get("/config/status")
 def get_config_status(patient_id: int = None):
     state = dict(config_state)
-    # system_on est par patient — le lire depuis la base
-    if patient_id:
-        state["system_on"] = lire_system_on(patient_id)
+    pid = patient_id or get_patient_id_from_db(None)
+    # system_on par patient
+    state["system_on"] = lire_system_on(pid) if pid else False
+    # mode_sans_wifi par patient
+    if pid:
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT valeur FROM config WHERE cle = %s;", (f'mode_sans_wifi_{pid}',))
+            row = cursor.fetchone()
+            state["mode_sans_wifi"] = row and row[0] == 'true'
+            cursor.close()
+        except Exception:
+            state["mode_sans_wifi"] = False
+        finally:
+            conn.close()
     else:
-        pid = get_patient_id_from_db(None)
-        state["system_on"] = lire_system_on(pid) if pid else False
+        state["mode_sans_wifi"] = False
     return state
 
 
@@ -571,6 +583,47 @@ def toggle_system(body: ConfigToggle, request: Request, patient_id: int = None):
 
         creer_alerte_systeme("systeme", f"Système arrêté — patient_{patient_id}")
         return {"status": "ok", "message": "Système arrêté"}
+
+
+@router.post("/config/mode-sans-wifi")
+def toggle_mode_sans_wifi(body: ConfigToggle, request: Request, patient_id: int = None):
+    """
+    Active/désactive le mode 'Je pars sans WiFi' pour un patient.
+    - actif = True  → prises futures conservées si offline (ESP32 stocke dans EEPROM)
+    - actif = False → comportement normal (prises supprimées si offline)
+    Le flag est sauvegardé dans config sous la clé mode_sans_wifi_{patient_id}
+    """
+    mqtt_client = getattr(request.app.state, 'mqtt_client', None)
+    patient_id = get_patient_id_from_db(patient_id)
+    if not patient_id:
+        return {"status": "error", "message": "Aucun patient trouvé"}
+
+    valeur = 'true' if body.enabled else 'false'
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO config (cle, valeur, updated_at)
+            VALUES (%s, %s, NOW())
+            ON CONFLICT (cle) DO UPDATE SET valeur = %s, updated_at = NOW();
+        """, (f'mode_sans_wifi_{patient_id}', valeur, valeur))
+        conn.commit()
+        cursor.close()
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+    finally:
+        conn.close()
+
+    # Publier sur MQTT pour que le subscriber soit aussi notifié
+    if mqtt_client and mqtt_client.is_connected():
+        mqtt_client.publish(
+            "medicinebox/mode",
+            json.dumps({"status": "sans_wifi", "patient_id": patient_id, "actif": body.enabled})
+        )
+
+    msg = "Mode sans WiFi activé — prises conservées pendant l'absence" if body.enabled else "Mode sans WiFi désactivé"
+    print(f"📶 mode_sans_wifi patient_{patient_id} → {valeur}")
+    return {"status": "ok", "message": msg, "actif": body.enabled}
 
 
 @router.post("/config/esp32-status")

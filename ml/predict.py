@@ -17,35 +17,43 @@ from db.database import get_connection
 MODELS_BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models")
 
 
-def get_models_dir(patient_id):
-    return os.path.join(MODELS_BASE_DIR, f"patient_{patient_id}")
+def get_models_dir(patient_id, profil_id=None):
+    if profil_id:
+        return os.path.join(MODELS_BASE_DIR, f"patient_{patient_id}", f"profil_{profil_id}")
+    return os.path.join(MODELS_BASE_DIR, f"patient_{patient_id}", "global")
 
 
-def models_exist(patient_id=None):
-    """Vérifie que les modèles existent pour ce patient"""
+def models_exist(patient_id=None, profil_id=None):
+    """Vérifie que les modèles existent pour ce patient/profil"""
     if patient_id is None:
-        # Vérifier si au moins un patient a des modèles
         if not os.path.exists(MODELS_BASE_DIR):
             return False
         for d in os.listdir(MODELS_BASE_DIR):
             if d.startswith("patient_"):
                 return True
-        # Fallback : anciens modèles sans patient
-        required = ["isolation_forest.joblib", "rf_classifier.joblib", "rf_regressor.joblib"]
-        return all(os.path.exists(os.path.join(MODELS_BASE_DIR, f)) for f in required)
+        return False
 
-    models_dir = get_models_dir(patient_id)
-    required = ["isolation_forest.joblib", "rf_classifier.joblib", "rf_regressor.joblib", "le_moment.joblib", "le_phase.joblib", "metadata.json"]
+    models_dir = get_models_dir(patient_id, profil_id)
+    required = ["isolation_forest.joblib", "rf_classifier.joblib", "rf_regressor.joblib",
+                "le_moment.joblib", "le_phase.joblib", "metadata.json"]
     return all(os.path.exists(os.path.join(models_dir, f)) for f in required)
 
 
-def load_models(patient_id):
-    """Charge les modèles du patient depuis son dossier"""
-    models_dir = get_models_dir(patient_id)
-
-    # Fallback vers les modèles globaux si pas de modèles spécifiques
-    if not models_exist(patient_id):
-        models_dir = MODELS_BASE_DIR
+def load_models(patient_id, profil_id=None):
+    """
+    Charge les modèles du patient.
+    Priorité : profil actif → global patient → erreur
+    """
+    # Essayer le modèle du profil actif d'abord
+    if profil_id and models_exist(patient_id, profil_id):
+        models_dir = get_models_dir(patient_id, profil_id)
+        source = f"profil_{profil_id}"
+    # Fallback → modèle global du patient
+    elif models_exist(patient_id):
+        models_dir = get_models_dir(patient_id)
+        source = "global"
+    else:
+        raise FileNotFoundError(f"Aucun modèle trouvé pour patient_{patient_id}")
 
     iso = joblib.load(os.path.join(models_dir, "isolation_forest.joblib"))
     clf = joblib.load(os.path.join(models_dir, "rf_classifier.joblib"))
@@ -54,6 +62,7 @@ def load_models(patient_id):
     le_phase = joblib.load(os.path.join(models_dir, "le_phase.joblib"))
     with open(os.path.join(models_dir, "metadata.json")) as f:
         meta = json.load(f)
+    meta["source_modele"] = source
     return iso, clf, reg, le_moment, le_phase, meta
 
 
@@ -75,22 +84,33 @@ def get_patient_context(patient_id):
         n_data = cursor.fetchone()[0]
         phase = "decouverte" if n_data < 21 else "adapte"
 
+        # Observance 7j — exclure cause_manque = 'offline'
         cursor.execute("""
             SELECT
                 COUNT(*) FILTER (WHERE statut = 'pris') AS pris,
-                COUNT(*) FILTER (WHERE statut IN ('pris','manque')) AS total
+                COUNT(*) FILTER (WHERE statut IN ('pris','manque')
+                    AND (cause_manque IS NULL OR cause_manque != 'offline')) AS total
             FROM prises
             WHERE patient_id = %s AND heure_prevue >= NOW() - INTERVAL '7 days';
         """, (patient_id,))
         obs = cursor.fetchone()
         observance_7j = (obs[0] / obs[1] * 100) if obs and obs[1] > 0 else 100
+
+        # Profil actif → pour charger le bon modèle
+        cursor.execute("""
+            SELECT id FROM intervalles_profils WHERE actif = TRUE ORDER BY id DESC LIMIT 1;
+        """)
+        row_profil = cursor.fetchone()
+        profil_actif_id = row_profil[0] if row_profil else None
+
         cursor.close()
         return {
             "next_prise": next_prise,
             "jour_semaine": datetime.now().weekday(),
             "phase": phase,
             "observance_7j": observance_7j,
-            "n_data": n_data
+            "n_data": n_data,
+            "profil_actif_id": profil_actif_id
         }
     finally:
         conn.close()
@@ -120,8 +140,9 @@ def predict(patient_id=None):
         }
 
     try:
-        iso, clf, reg, le_moment, le_phase, meta = load_models(patient_id)
         ctx = get_patient_context(patient_id)
+        profil_actif_id = ctx.get("profil_actif_id")
+        iso, clf, reg, le_moment, le_phase, meta = load_models(patient_id, profil_id=profil_actif_id)
         now = datetime.now()
         heure_alerte_min = now.hour * 60 + now.minute
 
@@ -138,8 +159,9 @@ def predict(patient_id=None):
 
         is_weekend = 1 if ctx["jour_semaine"] >= 5 else 0
         heure_norm = heure_alerte_min / (24 * 60)
+        profil_id_val = profil_actif_id or 0
 
-        X = np.array([[heure_alerte_min, ctx["jour_semaine"], moment_enc, phase_enc, is_weekend, heure_norm]])
+        X = np.array([[heure_alerte_min, ctx["jour_semaine"], moment_enc, phase_enc, is_weekend, heure_norm, profil_id_val]])
 
         anomalie_score = iso.decision_function(X)[0]
         anomalie = bool(iso.predict(X)[0] == -1)
@@ -164,8 +186,9 @@ def predict(patient_id=None):
             "observance_7j": ctx["observance_7j"],
             "moment": moment,
             "phase": ctx["phase"],
+            "profil_actif_id": profil_actif_id,
             "trained_at": meta.get("trained_at", "—"),
-            "modele": f"patient_{patient_id}" if models_exist(patient_id) else "global"
+            "modele": meta.get("source_modele", "global")
         }
 
     except Exception as e:

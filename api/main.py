@@ -358,8 +358,10 @@ async def tache_doses_manquees(mqtt_client):
                             prise_id = prise[0]
 
                             # ── Marquer la prise comme manquée ──
+                            # cause_manque = 'reel' → patient connecté, boîte allumée
+                            # → données valides pour le ML
                             cursor.execute("""
-                                UPDATE prises SET statut = 'manque'
+                                UPDATE prises SET statut = 'manque', cause_manque = 'reel'
                                 WHERE id = %s;
                             """, (prise_id,))
 

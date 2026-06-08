@@ -40,6 +40,7 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 MQTT_TOPICS = [
     "medicinebox/prise",
     "medicinebox/statut",
+    "medicinebox/mode",
 ]
 
 # ─── Variables de suivi reconnexion ───
@@ -72,6 +73,8 @@ def on_message(client, userdata, msg):
             handle_prise(data)
         elif topic == "medicinebox/statut":
             handle_statut(data)
+        elif topic == "medicinebox/mode":
+            handle_mode(data)
 
     except json.JSONDecodeError:
         print(f"⚠️ Message non-JSON sur {topic}: {msg.payload}")
@@ -185,6 +188,24 @@ def handle_statut(data):
             reconnexion_en_cours = True
             prises_recues_apres_reconnexion = False
 
+            # Désactiver mode_sans_wifi au retour WiFi
+            pid_online = data.get("patient_id")
+            if pid_online:
+                conn_tmp = get_connection()
+                try:
+                    cur_tmp = conn_tmp.cursor()
+                    cur_tmp.execute("""
+                        UPDATE config SET valeur = 'false', updated_at = NOW()
+                        WHERE cle = %s;
+                    """, (f'mode_sans_wifi_{pid_online}',))
+                    conn_tmp.commit()
+                    cur_tmp.close()
+                    print(f"📶 mode_sans_wifi patient_{pid_online} → false (WiFi retrouvé)")
+                except Exception:
+                    pass
+                finally:
+                    conn_tmp.close()
+
             # Lancer un timer de 30 secondes
             # Après 30s, on vérifie si des données EEPROM sont arrivées
             timer = threading.Timer(30.0, verifier_donnees_reconnexion)
@@ -234,22 +255,34 @@ def handle_statut(data):
                 print(f"💾 system_on[{pid}] → False (boîte éteinte)")
 
                 # Marquer les prises en_attente des jours passés comme 'manque'
+                # cause_manque = 'offline' → exclues du ML (panne involontaire)
                 cursor.execute("""
-                    UPDATE prises SET statut = 'manque'
+                    UPDATE prises SET statut = 'manque', cause_manque = 'offline'
                     WHERE patient_id = %s
                       AND statut = 'en_attente'
                       AND heure_prevue::date < CURRENT_DATE;
                 """, (pid,))
                 nb_manque = cursor.rowcount
 
-                # Supprimer les prises en_attente futures d'aujourd'hui
+                # Supprimer les prises futures SEULEMENT si pas en mode_sans_wifi
+                # mode_sans_wifi = patient parti avec la boîte → prises conservées pour sync EEPROM
                 cursor.execute("""
-                    DELETE FROM prises
-                    WHERE patient_id = %s
-                      AND statut = 'en_attente'
-                      AND heure_prevue > NOW();
-                """, (pid,))
-                nb_sup = cursor.rowcount
+                    SELECT valeur FROM config WHERE cle = %s;
+                """, (f'mode_sans_wifi_{pid}',))
+                row_wifi = cursor.fetchone()
+                mode_sans_wifi = row_wifi and row_wifi[0] == 'true'
+
+                if mode_sans_wifi:
+                    nb_sup = 0
+                    print(f"📶 patient_{pid} : mode_sans_wifi actif — prises futures conservées")
+                else:
+                    cursor.execute("""
+                        DELETE FROM prises
+                        WHERE patient_id = %s
+                          AND statut = 'en_attente'
+                          AND heure_prevue > NOW();
+                    """, (pid,))
+                    nb_sup = cursor.rowcount
 
                 conn.commit()
                 if nb_manque > 0 or nb_sup > 0:
@@ -287,6 +320,33 @@ def handle_statut(data):
             print(f"🚨 Alerte : {data.get('message')}")
         except Exception as e:
             print(f"❌ Erreur handle_statut : {e}")
+        finally:
+            conn.close()
+
+
+# ─── Handler : mode sans WiFi ───
+# Message depuis l'app (route POST /mode-sans-wifi) republié en MQTT
+# {"status": "sans_wifi", "patient_id": 1, "actif": true/false}
+def handle_mode(data):
+    patient_id = data.get("patient_id")
+    actif = data.get("actif", False)
+    status = data.get("status", "")
+
+    if status == "sans_wifi" and patient_id:
+        conn = get_connection()
+        try:
+            cursor = conn.cursor()
+            valeur = 'true' if actif else 'false'
+            cursor.execute("""
+                INSERT INTO config (cle, valeur, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (cle) DO UPDATE SET valeur = %s, updated_at = NOW();
+            """, (f'mode_sans_wifi_{patient_id}', valeur, valeur))
+            conn.commit()
+            cursor.close()
+            print(f"📶 mode_sans_wifi patient_{patient_id} → {valeur}")
+        except Exception as e:
+            print(f"❌ Erreur handle_mode : {e}")
         finally:
             conn.close()
 
