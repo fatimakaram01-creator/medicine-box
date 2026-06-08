@@ -334,6 +334,12 @@ def get_prises_today(patient_id: int = None):
 
 @router.get("/alertes")
 def get_alertes(patient_id: int = None):
+    """
+    Retourne uniquement les ALERTES MÉDICALES :
+    - dose_manquee : prise manquée
+    - anomalie    : comportement anormal détecté par le ML
+    Les notifications système/contexte vont dans /notifications
+    """
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -343,13 +349,46 @@ def get_alertes(patient_id: int = None):
             return {"error": "Aucun patient trouvé", "alertes": []}
         cursor.execute("""
             SELECT type, message, created_at, lu FROM alertes
-            WHERE patient_id = %s ORDER BY created_at DESC LIMIT 10;
+            WHERE patient_id = %s
+              AND type IN ('dose_manquee', 'anomalie')
+            ORDER BY created_at DESC LIMIT 20;
         """, (patient_id,))
         rows = cursor.fetchall()
         cursor.close()
         return [{"type": r[0], "message": r[1], "created_at": str(r[2]), "lu": r[3]} for r in rows]
     except Exception as e:
         return {"error": str(e), "alertes": []}
+    finally:
+        conn.close()
+
+
+@router.get("/notifications")
+def get_notifications(patient_id: int = None):
+    """
+    Retourne les NOTIFICATIONS SYSTÈME (tout sauf alertes médicales) :
+    - systeme          : on/off, hospitalisation, mode sans wifi
+    - contexte         : changement profil, prescription, Ramadan
+    - erreur_dispositif: erreur hardware ESP32
+    Côté médecin : filtre par patient_id sélectionné
+    """
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        patient_id = get_patient_id_from_db(patient_id)
+        if not patient_id:
+            cursor.close()
+            return []
+        cursor.execute("""
+            SELECT type, message, created_at, lu FROM alertes
+            WHERE patient_id = %s
+              AND type NOT IN ('dose_manquee', 'anomalie')
+            ORDER BY created_at DESC LIMIT 20;
+        """, (patient_id,))
+        rows = cursor.fetchall()
+        cursor.close()
+        return [{"type": r[0], "message": r[1], "created_at": str(r[2]), "lu": r[3]} for r in rows]
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         conn.close()
 

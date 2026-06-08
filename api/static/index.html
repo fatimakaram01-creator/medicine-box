@@ -823,10 +823,11 @@ async function loadAll() {
   const pidVal = patientActifId || selectedPatientId;
   const pid = pidVal ? `?patient_id=${pidVal}` : '';
 
-  const [patients, prises, alertes, observance, config] = await Promise.all([
+  const [patients, prises, alertes, notifications, observance, config] = await Promise.all([
     api('/patients'),
     api(`/prises/today${pid}`),
     api(`/alertes${pid}`),
+    api(`/notifications${pid}`),
     api(`/observance${pid}`),
     api(`/config/status${pid}`),
   ]);
@@ -834,7 +835,7 @@ async function loadAll() {
   renderPatientPage(patients, prises, alertes, observance);
   renderMedecinPage(patients, prises, alertes, observance);
   renderHistorique(alertes);
-  renderNotifications(alertes);
+  renderNotifications(notifications);
   renderBanners(config);
   if (config) { renderConfig(config); renderMedecinStatus(config); }
 
@@ -1151,12 +1152,15 @@ function renderHistPrises(hist) {
   `).join('');
 }
 
+// Affiche les ALERTES MÉDICALES (onglet Historique > Alertes)
+// Uniquement dose_manquee et anomalie — les notifications système sont dans la cloche 🔔
 function renderHistorique(alertes) {
   if (Array.isArray(alertes)) {
     document.getElementById('hist-alertes').innerHTML = alertes.map(a => {
-      const pillCls = a.type === 'dose_manquee' ? 'pill-warn' : a.type === 'erreur_dispositif' ? 'pill-danger' : 'pill-info';
-      return `<div class="hist-row"><div class="hist-time">${formatHeure(a.created_at)}</div><div class="hist-desc">${a.message}</div><span class="pill ${pillCls}">${a.type.replace('_',' ')}</span></div>`;
-    }).join('') || '<div class="loading">Aucune alerte</div>';
+      const pillCls = a.type === 'dose_manquee' ? 'pill-warn' : a.type === 'anomalie' ? 'pill-danger' : 'pill-info';
+      const icon = a.type === 'dose_manquee' ? '💊' : a.type === 'anomalie' ? '⚠️' : '📋';
+      return `<div class="hist-row"><div class="hist-time">${formatHeure(a.created_at)}</div><div class="hist-desc">${icon} ${a.message}</div><span class="pill ${pillCls}">${a.type.replace('_',' ')}</span></div>`;
+    }).join('') || '<div class="loading">Aucune alerte médicale</div>';
   }
 }
 
@@ -1641,39 +1645,37 @@ document.addEventListener('click', function(e) {
   if (p && b && !p.contains(e.target) && !b.contains(e.target)) closeNotif();
 });
 
-function renderNotifications(alertes) {
-  if (!Array.isArray(alertes)) return;
+// Affiche les NOTIFICATIONS SYSTÈME (cloche 🔔)
+// Les alertes médicales (dose_manquee + anomalie) sont dans l'onglet Historique > Alertes
+function renderNotifications(notifications) {
+  if (!Array.isArray(notifications)) notifications = [];
 
   const isPatient = document.getElementById('page-patient').style.display !== 'none';
   const isMedecin = document.getElementById('page-medecin').style.display !== 'none';
 
-  // Filtrer selon le rôle
-  let notifsFiltrees = alertes;
-  let titre = '';
-
-  if (isPatient) {
-    // Patient → uniquement ses doses manquées et alertes système
-    notifsFiltrees = alertes.filter(a =>
-      a.type === 'dose_manquee' || a.type === 'systeme' || a.type === 'erreur_dispositif'
-    );
-    titre = '🔔 Mes alertes';
-  } else if (isMedecin) {
-    // Médecin → toutes les alertes de tous ses patients
-    notifsFiltrees = alertes;
-    titre = '🩺 Alertes patients';
+  // Titre selon le contexte
+  let titre = 'Notifications';
+  if (isPatient) titre = '🔔 Mes notifications';
+  else if (isMedecin) {
+    // Médecin : on précise le patient concerné si sélectionné
+    const patientNom = document.querySelector('.patient-card.active .patient-name')?.textContent;
+    titre = patientNom ? `🩺 Notifications — ${patientNom}` : '🩺 Notifications patient';
   }
 
-  const unread = notifsFiltrees.filter(a => !a.lu);
+  const unread = notifications.filter(a => !a.lu);
   document.getElementById('notif-badge').textContent = unread.length > 0 ? unread.length : '0';
   document.getElementById('notif-count-pill').textContent = unread.length + ' nouvelles';
 
-  // Titre contextuel
   const titleEl = document.querySelector('.notif-header-title');
-  if (titleEl) titleEl.textContent = titre || 'Notifications';
+  if (titleEl) titleEl.textContent = titre;
 
-  document.getElementById('notif-list').innerHTML = notifsFiltrees.slice(0, 8).map(a => {
+  document.getElementById('notif-list').innerHTML = notifications.slice(0, 10).map(a => {
     const cls = a.lu ? '' : ' unread';
-    const icon = a.type === 'dose_manquee' ? '💊' : a.type === 'erreur_dispositif' ? '⚠️' : '📋';
+    // Icône selon le type de notification
+    let icon = '📋';
+    if (a.type === 'erreur_dispositif') icon = '⚠️';
+    else if (a.type === 'systeme') icon = '⚙️';
+    else if (a.type === 'contexte') icon = '🌙';
     return `<div class="notif-item${cls}">
       <div class="notif-item-title">${icon} ${a.type.replace(/_/g, ' ')}</div>
       <div class="notif-item-body">${a.message}</div>
