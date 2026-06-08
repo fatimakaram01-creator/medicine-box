@@ -41,6 +41,9 @@ class ChangementRx(BaseModel):
     frequence: int
     prescrit_par: str
     duree_jours: int
+    qty_matin: int = 1  # nombre de comprimés au matin
+    qty_midi: int = 1   # nombre de comprimés au midi
+    qty_soir: int = 1   # nombre de comprimés au soir
     mode: str = "remplacer"  # "remplacer" ou "nouveau" (polythérapie)
 
 
@@ -684,13 +687,15 @@ def changement_rx(body: ChangementRx, patient_id: int = None):
         # pour être cohérentes avec les plages du profil actif
         moments_config = _get_moments_config()
         moments = ['matin', 'midi', 'soir']
+        qtys = {'matin': body.qty_matin, 'midi': body.qty_midi, 'soir': body.qty_soir}
         for i in range(body.frequence):
             moment = moments[i]
             heure = moments_config.get(moment, '08:30:00')
+            quantite = qtys.get(moment, 1)
             cursor.execute("""
                 INSERT INTO prescription_doses (prescription_id, medicament_id, moment, heure_prevue, quantite)
-                VALUES (%s, %s, %s, %s, 1);
-            """, (prescription_id, medicament_id, moment, heure))
+                VALUES (%s, %s, %s, %s, %s);
+            """, (prescription_id, medicament_id, moment, heure, quantite))
 
         conn.commit()
         cursor.close()
@@ -862,7 +867,10 @@ def get_prescription_active(patient_id: int = None):
         cursor.execute("""
             SELECT p.id, p.medecin, p.date_debut::text, p.date_fin::text,
                    m.nom, m.dosage,
-                   COUNT(pd.id) as nb_prises
+                   COUNT(pd.id) as nb_prises,
+                   COALESCE(SUM(CASE WHEN pd.moment = 'matin' THEN pd.quantite ELSE 0 END), 0) as qty_matin,
+                   COALESCE(SUM(CASE WHEN pd.moment = 'midi' THEN pd.quantite ELSE 0 END), 0) as qty_midi,
+                   COALESCE(SUM(CASE WHEN pd.moment = 'soir' THEN pd.quantite ELSE 0 END), 0) as qty_soir
             FROM prescriptions p
             LEFT JOIN prescription_doses pd ON pd.prescription_id = p.id
             LEFT JOIN medicaments m ON m.id = pd.medicament_id
@@ -883,7 +891,10 @@ def get_prescription_active(patient_id: int = None):
             "date_fin": row[3],
             "medicament": row[4] or "—",
             "dosage": row[5] or "—",
-            "nb_prises_jour": row[6]
+            "nb_prises_jour": row[6],
+            "qty_matin": int(row[7]),
+            "qty_midi": int(row[8]),
+            "qty_soir": int(row[9])
         }
     except Exception as e:
         return {"error": str(e)}
@@ -935,7 +946,10 @@ def get_prescriptions_historique(patient_id: int = None):
                    p.active,
                    STRING_AGG(DISTINCT m.nom || ' ' || COALESCE(m.dosage,''), ', ') as medicaments,
                    COUNT(DISTINCT pd.id) as nb_doses,
-                   (p.date_fin - p.date_debut) as duree_jours
+                   (p.date_fin - p.date_debut) as duree_jours,
+                   COALESCE(SUM(CASE WHEN pd.moment = 'matin' THEN pd.quantite ELSE 0 END), 0) as qty_matin,
+                   COALESCE(SUM(CASE WHEN pd.moment = 'midi' THEN pd.quantite ELSE 0 END), 0) as qty_midi,
+                   COALESCE(SUM(CASE WHEN pd.moment = 'soir' THEN pd.quantite ELSE 0 END), 0) as qty_soir
             FROM prescriptions p
             LEFT JOIN prescription_doses pd ON pd.prescription_id = p.id
             LEFT JOIN medicaments m ON m.id = pd.medicament_id
@@ -953,7 +967,10 @@ def get_prescriptions_historique(patient_id: int = None):
             "active": r[4],
             "medicaments": r[5] or "—",
             "nb_doses": r[6],
-            "duree_jours": int(r[7]) if r[7] else 0
+            "duree_jours": int(r[7]) if r[7] else 0,
+            "qty_matin": int(r[8]),
+            "qty_midi": int(r[9]),
+            "qty_soir": int(r[10])
         } for r in rows]
     except Exception as e:
         return {"error": str(e)}

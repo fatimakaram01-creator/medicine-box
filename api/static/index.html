@@ -566,11 +566,26 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
       <input type="hidden" id="rx-mode" value="remplacer">
       <input type="text" id="rx-medicament" placeholder="Médicament (ex: Doliprane)" value="Doliprane">
       <input type="text" id="rx-dosage" placeholder="Dosage (ex: 500mg)" value="500mg">
-      <select id="rx-frequence">
+      <select id="rx-frequence" onchange="toggleQtyInputs()">
         <option value="1">1 prise / jour</option>
         <option value="2">2 prises / jour</option>
         <option value="3" selected>3 prises / jour</option>
       </select>
+      <!-- Quantités par moment (affichées dynamiquement selon fréquence) -->
+      <div id="rx-quantites" style="display:flex;gap:6px;margin-bottom:8px">
+        <div id="rx-qty-matin-wrap" style="flex:1">
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px">Matin (cp)</label>
+          <input type="number" id="rx-qty-matin" min="1" max="10" value="1" style="width:100%">
+        </div>
+        <div id="rx-qty-midi-wrap" style="flex:1">
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px">Midi (cp)</label>
+          <input type="number" id="rx-qty-midi" min="1" max="10" value="1" style="width:100%">
+        </div>
+        <div id="rx-qty-soir-wrap" style="flex:1">
+          <label style="font-size:11px;color:var(--text-secondary);display:block;margin-bottom:3px">Soir (cp)</label>
+          <input type="number" id="rx-qty-soir" min="1" max="10" value="1" style="width:100%">
+        </div>
+      </div>
       <input type="text" id="rx-prescripteur" placeholder="Prescrit par (ex: Dr. Saidi)" value="Dr. Saidi">
       <input type="number" id="rx-duree" placeholder="Durée en jours" value="30">
       <button class="btn btn-primary" onclick="changerRx()" style="margin-top:4px;width:100%">Valider</button>
@@ -1104,7 +1119,7 @@ function renderHistPrescriptions(prescriptions) {
         <div class="tl-dot" style="background:${isActive ? 'var(--green-dot)' : isArretee ? 'var(--red-dot)' : 'var(--gray-dot)'}"></div>
         <div class="tl-info">
           <div class="tl-name">💊 ${p.medicaments || 'N/A'}</div>
-          <div class="tl-sub">${p.nb_doses} dose(s)/jour · ${p.medecin}</div>
+          <div class="tl-sub">${formatQuantites({qty_matin: p.qty_matin, qty_midi: p.qty_midi, qty_soir: p.qty_soir, nb_prises_jour: p.nb_doses})} · ${p.medecin}</div>
           <div class="tl-sub" style="margin-top:2px">
             Du ${p.date_debut} → ${p.date_fin}
           </div>
@@ -1247,14 +1262,26 @@ function toggleModeRx(mode) {
     : 'Ajoute un médicament supplémentaire — les prescriptions actives sont conservées';
 }
 
+// Affiche/masque les inputs de quantité selon la fréquence sélectionnée
+function toggleQtyInputs() {
+  const freq = parseInt(document.getElementById('rx-frequence').value);
+  document.getElementById('rx-qty-matin-wrap').style.display = freq >= 1 ? 'block' : 'none';
+  document.getElementById('rx-qty-midi-wrap').style.display  = freq >= 2 ? 'block' : 'none';
+  document.getElementById('rx-qty-soir-wrap').style.display  = freq >= 3 ? 'block' : 'none';
+}
+
 async function changerRx() {
+  const freq = parseInt(document.getElementById('rx-frequence').value);
   const data = {
     medicament: document.getElementById('rx-medicament').value,
     dosage: document.getElementById('rx-dosage').value,
-    frequence: parseInt(document.getElementById('rx-frequence').value),
+    frequence: freq,
     prescrit_par: document.getElementById('rx-prescripteur').value,
     duree_jours: parseInt(document.getElementById('rx-duree').value),
-    mode: document.getElementById('rx-mode').value
+    mode: document.getElementById('rx-mode').value,
+    qty_matin: parseInt(document.getElementById('rx-qty-matin').value) || 1,
+    qty_midi:  parseInt(document.getElementById('rx-qty-midi').value)  || 1,
+    qty_soir:  parseInt(document.getElementById('rx-qty-soir').value)  || 1
   };
   const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
   const res = await api(`/config/changement-rx${pidParam}`, { method: 'POST', body: JSON.stringify(data) });
@@ -1264,6 +1291,15 @@ async function changerRx() {
 // ══════════════════════════════════════════════════
 // PRESCRIPTION ACTIVE
 // ══════════════════════════════════════════════════
+// Construit le détail des quantités par moment (ex: "2 cp matin · 1 cp midi · 1 cp soir")
+function formatQuantites(rx) {
+  const parts = [];
+  if (rx.qty_matin > 0) parts.push(`${rx.qty_matin} cp matin`);
+  if (rx.qty_midi  > 0) parts.push(`${rx.qty_midi} cp midi`);
+  if (rx.qty_soir  > 0) parts.push(`${rx.qty_soir} cp soir`);
+  return parts.length ? parts.join(' · ') : `${rx.nb_prises_jour} prise(s)/jour`;
+}
+
 function renderPrescriptionPatient(rx) {
   const div = document.getElementById('rx-patient');
   if (!div) return;
@@ -1276,7 +1312,7 @@ function renderPrescriptionPatient(rx) {
       <div style="font-size:28px">💊</div>
       <div style="flex:1">
         <div style="font-size:14px;font-weight:500">${rx.medicament} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">${rx.dosage}</span></div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${rx.nb_prises_jour} prise(s)/jour · ${rx.medecin}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${formatQuantites(rx)} · ${rx.medecin}</div>
         <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Du ${rx.date_debut} → ${rx.date_fin}</div>
       </div>
       <span class="pill pill-ok"><span class="pill-dot"></span>Active</span>
@@ -1296,7 +1332,7 @@ function renderPrescriptionMedecin(rx) {
       <div style="font-size:28px">💊</div>
       <div style="flex:1">
         <div style="font-size:14px;font-weight:500">${rx.medicament} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">${rx.dosage}</span></div>
-        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${rx.nb_prises_jour} prise(s)/jour · ${rx.medecin}</div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${formatQuantites(rx)} · ${rx.medecin}</div>
         <div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">Du ${rx.date_debut} → ${rx.date_fin}</div>
       </div>
       <span class="pill pill-ok"><span class="pill-dot"></span>Active</span>
@@ -1565,7 +1601,7 @@ function renderHistMedecin(hist, alertes, prescriptions) {
           <div class="tl-dot" style="background:${isActive?'var(--green-dot)':isArretee?'var(--red-dot)':'var(--gray-dot)'}"></div>
           <div class="tl-info">
             <div class="tl-name">💊 ${p.medicaments || 'N/A'}</div>
-            <div class="tl-sub">${p.nb_doses} dose(s)/jour · ${p.medecin}</div>
+            <div class="tl-sub">${formatQuantites({qty_matin: p.qty_matin, qty_midi: p.qty_midi, qty_soir: p.qty_soir, nb_prises_jour: p.nb_doses})} · ${p.medecin}</div>
             <div class="tl-sub" style="margin-top:2px">Du ${p.date_debut} → ${p.date_fin} · ${duree} jour(s)</div>
           </div>
           <div class="tl-right">${pillHtml}</div>
