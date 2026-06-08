@@ -553,6 +553,34 @@ def _patients_prets_pour_ml():
         conn.close()
 
 
+def verifier_et_entrainer_au_demarrage():
+    """
+    Au démarrage du serveur :
+    - Vérifie quels patients sont prêts (≥7 jours de prises)
+    - Si leurs modèles ML n'existent pas → entraîne maintenant
+    Évite d'attendre 00h05 après un reset BDD ou un nouveau déploiement.
+    """
+    import os
+    try:
+        from ml.predict import models_exist
+        patients_prets = _patients_prets_pour_ml()
+        if not patients_prets:
+            print("[ML] ⏳ Aucun patient prêt au démarrage (besoin ≥7 jours)")
+            return
+
+        # Trouver les patients prêts MAIS sans modèles entraînés
+        patients_sans_modeles = [pid for pid in patients_prets if not models_exist(pid)]
+
+        if patients_sans_modeles:
+            print(f"[ML] 🚀 Entraînement initial pour patient(s) : {patients_sans_modeles}")
+            ml_train()
+            print("[ML] ✅ Entraînement initial terminé")
+        else:
+            print(f"[ML] ✓ Modèles déjà présents pour : {patients_prets}")
+    except Exception as e:
+        print(f"[ML] ❌ Erreur entraînement au démarrage : {e}")
+
+
 async def tache_ml_nuit():
     """
     Ré-entraîne les modèles ML chaque nuit à 00h05.
@@ -645,6 +673,10 @@ async def lifespan(app: FastAPI):
     mqtt_client = start_mqtt()
     app.state.mqtt_client = mqtt_client
 
+    # ── Entraînement ML au démarrage si patients prêts sans modèles ──
+    # Évite d'attendre 00h05 après un reset BDD ou un nouveau déploiement
+    verifier_et_entrainer_au_demarrage()
+
     # ── Démarrage : lance les tâches en arrière-plan ──
     # asyncio.create_task() = exécute la fonction en parallèle
     # sans bloquer le démarrage de FastAPI
@@ -660,6 +692,7 @@ async def lifespan(app: FastAPI):
     print("   ⏰ Tâche génération prises   : active (toutes les 30 min)")
     print("   ⏰ Tâche heartbeat ESP32     : active (toutes les 10 min)")
     print("   ⏰ Tâche ML nuit            : active (chaque nuit à 00h05)")
+    print("   🤖 ML initial               : vérifié au démarrage")
 
     yield
 
