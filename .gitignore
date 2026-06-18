@@ -9,3 +9,4 @@ ml/models/*.joblib
 ml/models/metadata.json
 ml/models/*.joblib
 ml/models/metadata.json
+ml/models/
