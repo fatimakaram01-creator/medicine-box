@@ -848,18 +848,33 @@ def creer_alerte_systeme(type_alerte, message):
 # HELPER : lire les plages horaires du profil actif
 # ═══════════════════════════════════════════════════════
 
-def _get_moments_config():
+def _get_moments_config(patient_id=None):
     """
     Retourne les heures de référence (milieu de plage) du profil actif.
+    Résolution par patient : le profil PERSONNALISÉ actif du patient gagne,
+    sinon le profil GLOBAL actif (patient_id IS NULL). Si patient_id est None,
+    on ne prend que le profil global actif.
     Fallback sur les valeurs par défaut si aucun profil trouvé.
     """
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT matin_debut, matin_fin, midi_debut, midi_fin, soir_debut, soir_fin
-            FROM intervalles_profils WHERE actif = TRUE;
-        """)
+        if patient_id is not None:
+            cursor.execute("""
+                SELECT matin_debut, matin_fin, midi_debut, midi_fin, soir_debut, soir_fin
+                FROM intervalles_profils
+                WHERE actif = TRUE AND (patient_id = %s OR patient_id IS NULL)
+                ORDER BY patient_id NULLS LAST, id DESC
+                LIMIT 1;
+            """, (patient_id,))
+        else:
+            cursor.execute("""
+                SELECT matin_debut, matin_fin, midi_debut, midi_fin, soir_debut, soir_fin
+                FROM intervalles_profils
+                WHERE actif = TRUE AND patient_id IS NULL
+                ORDER BY id DESC
+                LIMIT 1;
+            """)
         row = cursor.fetchone()
         cursor.close()
         if not row:
@@ -1018,18 +1033,34 @@ def get_prescriptions_historique(patient_id: int = None):
 
 
 @router.get("/intervalles/profil-actif")
-def get_profil_actif_firmware():
-    """Retourne le profil actif avec les heures brutes — utilisé par le firmware ESP32"""
+def get_profil_actif_firmware(patient_id: int = None):
+    """Retourne le profil actif avec les heures brutes — utilisé par le firmware ESP32.
+    Résolution par patient : perso du patient gagne, sinon global."""
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, label,
-                   matin_debut::text, matin_fin::text,
-                   midi_debut::text,  midi_fin::text,
-                   soir_debut::text,  soir_fin::text
-            FROM intervalles_profils WHERE actif = TRUE;
-        """)
+        if patient_id is not None:
+            cursor.execute("""
+                SELECT id, label,
+                       matin_debut::text, matin_fin::text,
+                       midi_debut::text,  midi_fin::text,
+                       soir_debut::text,  soir_fin::text
+                FROM intervalles_profils
+                WHERE actif = TRUE AND (patient_id = %s OR patient_id IS NULL)
+                ORDER BY patient_id NULLS LAST, id DESC
+                LIMIT 1;
+            """, (patient_id,))
+        else:
+            cursor.execute("""
+                SELECT id, label,
+                       matin_debut::text, matin_fin::text,
+                       midi_debut::text,  midi_fin::text,
+                       soir_debut::text,  soir_fin::text
+                FROM intervalles_profils
+                WHERE actif = TRUE AND patient_id IS NULL
+                ORDER BY id DESC
+                LIMIT 1;
+            """)
         row = cursor.fetchone()
         cursor.close()
         if not row:
@@ -1050,18 +1081,24 @@ def get_profil_actif_firmware():
         conn.close()
 
 
-def _regenerer_prises_du_jour(conn_externe=None):
+def _regenerer_prises_du_jour(conn_externe=None, patient_ids=None):
     """
-    Supprime et régénère les prises EN_ATTENTE du jour pour tous les patients
-    selon le nouveau profil actif. Appelé après changement d'intervalle.
+    Supprime et régénère les prises EN_ATTENTE du jour selon le profil actif.
+    Résolution du profil PAR patient (perso gagne sinon global).
+    Si patient_ids est fourni → ne régénère que ces patients (cas profil perso),
+    sinon tous les patients actifs (cas profil global).
+    Appelé après changement d'intervalle.
     """
     conn = conn_externe or get_connection()
     try:
         cursor = conn.cursor()
-        moments_config = _get_moments_config()
-        cursor.execute("SELECT id FROM patients WHERE active = TRUE;")
-        patients = [r[0] for r in cursor.fetchall()]
+        if patient_ids:
+            patients = list(patient_ids)
+        else:
+            cursor.execute("SELECT id FROM patients WHERE active = TRUE;")
+            patients = [r[0] for r in cursor.fetchall()]
         for patient_id in patients:
+            moments_config = _get_moments_config(patient_id)
             # Supprimer uniquement les prises en_attente d'aujourd'hui
             cursor.execute("""
                 DELETE FROM prises
@@ -1187,7 +1224,7 @@ def get_intervalles_profils():
                    midi_debut::text,  midi_fin::text,
                    soir_debut::text,  soir_fin::text,
                    date_debut::text,  date_fin::text,
-                   actif, nb_prises
+                   actif, nb_prises, patient_id
             FROM intervalles_profils
             ORDER BY actif DESC, date_debut DESC;
         """)
@@ -1198,7 +1235,9 @@ def get_intervalles_profils():
                  "midi_debut":  r[4], "midi_fin":  r[5],
                  "soir_debut":  r[6], "soir_fin":  r[7],
                  "date_debut":  r[8], "date_fin":  r[9],
-                 "actif": r[10], "nb_prises": r[11]} for r in rows]
+                 "actif": r[10], "nb_prises": r[11],
+                 "patient_id": r[12],
+                 "scope": "global" if r[12] is None else "personnalise"} for r in rows]
     except Exception as e:
         return {"error": str(e)}
     finally:
@@ -1213,32 +1252,50 @@ class NouveauProfil(BaseModel):
     midi_fin: str
     soir_debut: str
     soir_fin: str
+    patient_id: Optional[int] = None   # renseigné si scope = personnalise
+    scope: str = "personnalise"        # "personnalise" (ce patient) ou "global" (tous)
 
 
 @router.post("/intervalles/profils")
 def creer_profil(data: NouveauProfil):
-    """Crée un nouveau profil et le définit comme actif"""
+    """Crée un nouveau profil et le définit comme actif.
+    - scope = 'global'      → désactive TOUS les profils actifs (perso compris),
+                              insère patient_id NULL, publie à toutes les boîtes.
+    - scope = 'personnalise' → désactive seulement les profils actifs DE CE PATIENT,
+                              insère patient_id = X, publie à la boîte de ce patient.
+    """
+    est_global = (data.scope == "global") or (data.patient_id is None and data.scope != "personnalise")
+    pid = None if est_global else data.patient_id
+    if not est_global and pid is None:
+        return {"error": "patient_id requis pour un profil personnalisé"}
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        # Désactiver l'ancien profil actif
-        cursor.execute("""
-            UPDATE intervalles_profils
-            SET actif = FALSE, date_fin = CURRENT_DATE
-            WHERE actif = TRUE;
-        """)
+        # Désactiver les anciens profils actifs (tous si global, sinon ceux de ce patient)
+        if est_global:
+            cursor.execute("""
+                UPDATE intervalles_profils
+                SET actif = FALSE, date_fin = CURRENT_DATE
+                WHERE actif = TRUE;
+            """)
+        else:
+            cursor.execute("""
+                UPDATE intervalles_profils
+                SET actif = FALSE, date_fin = CURRENT_DATE
+                WHERE actif = TRUE AND patient_id = %s;
+            """, (pid,))
         # Créer le nouveau profil
         cursor.execute("""
             INSERT INTO intervalles_profils
                 (label, matin_debut, matin_fin, midi_debut, midi_fin,
-                 soir_debut, soir_fin, actif, date_debut)
-            VALUES (%s,%s,%s,%s,%s,%s,%s, TRUE, CURRENT_DATE)
+                 soir_debut, soir_fin, patient_id, actif, date_debut)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s, TRUE, CURRENT_DATE)
             RETURNING id;
         """, (data.label, data.matin_debut, data.matin_fin,
               data.midi_debut, data.midi_fin,
-              data.soir_debut, data.soir_fin))
+              data.soir_debut, data.soir_fin, pid))
         new_id = cursor.fetchone()[0]
-        # Mettre à jour config
+        # Mettre à jour config (info globale d'horodatage)
         cursor.execute("""
             UPDATE config SET valeur = %s
             WHERE cle = 'intervalles_profil_actif_id';
@@ -1249,25 +1306,31 @@ def creer_profil(data: NouveauProfil):
         """)
         conn.commit()
         cursor.close()
-        creer_alerte_systeme("contexte", f"Nouveau profil horaire créé : {data.label}")
-        _regenerer_prises_du_jour(conn_externe=None)
+        scope_txt = "global" if est_global else f"personnalisé (patient {pid})"
+        creer_alerte_systeme("contexte", f"Nouveau profil horaire {scope_txt} : {data.label}")
+        # Régénérer les prises : tous si global, sinon seulement ce patient
+        _regenerer_prises_du_jour(conn_externe=None, patient_ids=None if est_global else [pid])
         # Publier les nouveaux intervalles via MQTT → ESP32 les reçoit en temps réel
         try:
             from api.main import app as main_app
             mqtt_client = getattr(main_app.state, 'mqtt_client', None)
             if mqtt_client and mqtt_client.is_connected():
                 import json as json_mod
-                payload = json_mod.dumps({
+                payload_dict = {
                     "action": "update_intervalles",
                     "matin_debut": data.matin_debut, "matin_fin": data.matin_fin,
                     "midi_debut":  data.midi_debut,  "midi_fin":  data.midi_fin,
                     "soir_debut":  data.soir_debut,  "soir_fin":  data.soir_fin
-                })
-                mqtt_client.publish("medicinebox/commande", payload)
-                print(f"[MQTT] Intervalles publiés → ESP32")
+                }
+                # global → pas de patient_id (toutes les boîtes appliquent)
+                # perso  → patient_id ciblé (seule cette boîte applique)
+                if not est_global:
+                    payload_dict["patient_id"] = pid
+                mqtt_client.publish("medicinebox/commande", json_mod.dumps(payload_dict))
+                print(f"[MQTT] Intervalles publiés → ESP32 ({scope_txt})")
         except Exception as e:
             print(f"[MQTT] Erreur publication intervalles : {e}")
-        return {"success": True, "id": new_id}
+        return {"success": True, "id": new_id, "scope": "global" if est_global else "personnalise"}
     except Exception as e:
         return {"error": str(e)}
     finally:
@@ -1280,19 +1343,28 @@ def activer_profil(profil_id: int):
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        # Vérifier que le profil existe
-        cursor.execute("SELECT label FROM intervalles_profils WHERE id = %s;", (profil_id,))
+        # Vérifier que le profil existe + lire son scope (patient_id)
+        cursor.execute("SELECT label, patient_id FROM intervalles_profils WHERE id = %s;", (profil_id,))
         row = cursor.fetchone()
         if not row:
             cursor.close()
             return {"error": "Profil introuvable"}
         label = row[0]
-        # Désactiver l'actuel
-        cursor.execute("""
-            UPDATE intervalles_profils
-            SET actif = FALSE, date_fin = CURRENT_DATE
-            WHERE actif = TRUE;
-        """)
+        prof_pid = row[1]            # None = profil global, sinon profil d'un patient
+        est_global = prof_pid is None
+        # Désactiver l'actuel : tous si on réactive un global, sinon ceux de ce patient
+        if est_global:
+            cursor.execute("""
+                UPDATE intervalles_profils
+                SET actif = FALSE, date_fin = CURRENT_DATE
+                WHERE actif = TRUE;
+            """)
+        else:
+            cursor.execute("""
+                UPDATE intervalles_profils
+                SET actif = FALSE, date_fin = CURRENT_DATE
+                WHERE actif = TRUE AND patient_id = %s;
+            """, (prof_pid,))
         # Réactiver l'ancien — nouvelle période
         cursor.execute("""
             UPDATE intervalles_profils
@@ -1311,7 +1383,7 @@ def activer_profil(profil_id: int):
         conn.commit()
         cursor.close()
         creer_alerte_systeme("contexte", f"Profil horaire réactivé : {label}")
-        _regenerer_prises_du_jour(conn_externe=None)
+        _regenerer_prises_du_jour(conn_externe=None, patient_ids=None if est_global else [prof_pid])
         # Publier les nouveaux intervalles via MQTT → ESP32 les reçoit en temps réel
         try:
             from api.main import app as main_app
@@ -1330,13 +1402,15 @@ def activer_profil(profil_id: int):
                 r = cur2.fetchone()
                 cur2.close(); conn2.close()
                 if r:
-                    payload = json_mod.dumps({
+                    payload_dict = {
                         "action": "update_intervalles",
                         "matin_debut": r[0], "matin_fin": r[1],
                         "midi_debut":  r[2], "midi_fin":  r[3],
                         "soir_debut":  r[4], "soir_fin":  r[5]
-                    })
-                    mqtt_client.publish("medicinebox/commande", payload)
+                    }
+                    if not est_global:
+                        payload_dict["patient_id"] = prof_pid
+                    mqtt_client.publish("medicinebox/commande", json_mod.dumps(payload_dict))
                     print(f"[MQTT] Intervalles publiés → ESP32")
         except Exception as e:
             print(f"[MQTT] Erreur publication intervalles : {e}")

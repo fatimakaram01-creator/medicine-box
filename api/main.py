@@ -255,9 +255,10 @@ async def tache_alertes(mqtt_client):
 # C'est le nettoyage au démarrage qui les supprime à la reconnexion.
 # ─────────────────────────────────────────────────────────────
 
-def _get_fin_intervalles():
+def _get_fin_intervalles(patient_id=None):
     """
     Lit les fins de plages du profil actif depuis Supabase.
+    Résolution par patient : profil perso du patient s'il existe, sinon global.
     Retourne un dict {moment: heure_fin_en_heures}.
     Ignore les plages désactivées (00:00).
     Fallback sur les valeurs par défaut si aucun profil.
@@ -265,10 +266,22 @@ def _get_fin_intervalles():
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT matin_fin, midi_fin, soir_fin
-            FROM intervalles_profils WHERE actif = TRUE;
-        """)
+        if patient_id is not None:
+            cursor.execute("""
+                SELECT matin_fin, midi_fin, soir_fin
+                FROM intervalles_profils
+                WHERE actif = TRUE AND (patient_id = %s OR patient_id IS NULL)
+                ORDER BY patient_id NULLS LAST, id DESC
+                LIMIT 1;
+            """, (patient_id,))
+        else:
+            cursor.execute("""
+                SELECT matin_fin, midi_fin, soir_fin
+                FROM intervalles_profils
+                WHERE actif = TRUE AND patient_id IS NULL
+                ORDER BY id DESC
+                LIMIT 1;
+            """)
         row = cursor.fetchone()
         cursor.close()
         if not row:
@@ -314,10 +327,6 @@ async def tache_doses_manquees(mqtt_client):
             maintenant = datetime.now()
             heure_actuelle = maintenant.hour
 
-            # ── Lire les fins de plages du profil actif ──
-            # (lu à chaque cycle pour capter les changements de profil)
-            fin_intervalle = _get_fin_intervalles()
-
             conn = get_connection()
             try:
                 cursor = conn.cursor()
@@ -334,6 +343,9 @@ async def tache_doses_manquees(mqtt_client):
                     from api.routes import lire_system_on
                     if not lire_system_on(patient_id):
                         continue  # système OFF → pas de détection doses manquées
+
+                    # ── Fins de plages du profil actif DE CE PATIENT (perso sinon global) ──
+                    fin_intervalle = _get_fin_intervalles(patient_id)
 
                     # ── Vérifier chaque moment actif du profil ──
                     for moment, heure_fin in fin_intervalle.items():
@@ -436,7 +448,6 @@ async def tache_generation_prises():
 
             maintenant = datetime.now()
             aujourd_hui = maintenant.date()
-            moments_config = _get_moments_config()
 
             conn = get_connection()
             try:
@@ -449,6 +460,9 @@ async def tache_generation_prises():
                     from api.routes import lire_system_on
                     if not lire_system_on(patient_id):
                         continue  # système OFF pour ce patient → pas de prises
+
+                    # ── Profil actif DE CE PATIENT (perso sinon global) ──
+                    moments_config = _get_moments_config(patient_id)
 
                     # ── Vérifier prescription active ──
                     cursor.execute("""

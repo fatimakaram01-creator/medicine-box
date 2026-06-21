@@ -96,10 +96,13 @@ def get_patient_context(patient_id):
         obs = cursor.fetchone()
         observance_7j = (obs[0] / obs[1] * 100) if obs and obs[1] > 0 else 100
 
-        # Profil actif → pour charger le bon modèle
+        # Profil actif → pour charger le bon modèle (perso du patient sinon global)
         cursor.execute("""
-            SELECT id FROM intervalles_profils WHERE actif = TRUE ORDER BY id DESC LIMIT 1;
-        """)
+            SELECT id FROM intervalles_profils
+            WHERE actif = TRUE AND (patient_id = %s OR patient_id IS NULL)
+            ORDER BY patient_id NULLS LAST, id DESC
+            LIMIT 1;
+        """, (patient_id,))
         row_profil = cursor.fetchone()
         profil_actif_id = row_profil[0] if row_profil else None
 

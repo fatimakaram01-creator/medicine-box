@@ -630,6 +630,16 @@ nav{background:var(--surface);border-bottom:0.5px solid var(--border-md);positio
           </div>
         </div>
       </div>
+      <div style="display:flex;gap:8px;margin:4px 0 12px">
+        <label style="flex:1;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 10px;border:1px solid var(--border-md);border-radius:var(--radius-sm);font-size:12px">
+          <input type="radio" name="profil-scope" value="personnalise" checked style="flex-shrink:0">
+          <span>👤 Personnalisé<br><span style="font-size:10px;color:var(--text-secondary)">ce patient seulement</span></span>
+        </label>
+        <label style="flex:1;display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 10px;border:1px solid var(--border-md);border-radius:var(--radius-sm);font-size:12px">
+          <input type="radio" name="profil-scope" value="global" style="flex-shrink:0">
+          <span>🌍 Global<br><span style="font-size:10px;color:var(--text-secondary)">tous les patients</span></span>
+        </label>
+      </div>
       <button class="btn btn-primary" onclick="creerProfil()" style="width:100%">Créer ce profil et l'activer</button>
     </div>
   </div>
@@ -2113,6 +2123,7 @@ function togglePlage(moment) {
 async function creerProfil() {
   const label = document.getElementById('profil-label').value.trim();
   if (!label) { showToast('Entrez un label pour ce profil'); return; }
+  const scope = document.querySelector('input[name="profil-scope"]:checked')?.value || 'personnalise';
   const data = {
     label,
     matin_debut: document.getElementById('matin-debut').value,
@@ -2121,10 +2132,16 @@ async function creerProfil() {
     midi_fin:    document.getElementById('midi-fin').value,
     soir_debut:  document.getElementById('soir-debut').value,
     soir_fin:    document.getElementById('soir-fin').value,
+    scope,
   };
+  if (scope === 'personnalise') {
+    if (!selectedPatientId) { showToast('Sélectionnez un patient pour un profil personnalisé'); return; }
+    data.patient_id = selectedPatientId;
+  }
   const res = await api('/intervalles/profils', { method: 'POST', body: JSON.stringify(data) });
   if (res?.success) {
-    showToast(`✅ Profil "${label}" créé et activé`);
+    const cible = scope === 'global' ? 'tous les patients' : 'ce patient';
+    showToast(`✅ Profil "${label}" créé (${cible})`);
     document.getElementById('profil-label').value = '';
     const profils = await api('/intervalles/profils');
     if (profils) {
