@@ -1046,7 +1046,11 @@ function renderCompGrid(prises, hist) {
 // PAGE MÉDECIN
 // ══════════════════════════════════════════════════
 function renderMedecinPage(patients, prises, alertes, observance) {
-  const p = Array.isArray(patients) && patients[0] ? patients[0] : { prenom: 'Patient', nom: '', medecin: '' };
+  // FIX : prendre le patient SÉLECTIONNÉ (selectedPatientId), pas toujours le premier de la liste.
+  // Avant : patients[0] → le bloc infos affichait toujours le 1er patient de la base.
+  const p = (Array.isArray(patients)
+              && (patients.find(x => x.id === selectedPatientId) || patients[0]))
+            || { prenom: 'Patient', nom: '', medecin: '' };
   document.getElementById('medecin-sub').textContent = `Patient : ${p.prenom} ${p.nom} · ${formatDate(new Date())}`;
 
   const obs = observance?.pourcentage || 0;
