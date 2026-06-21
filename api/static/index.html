@@ -1209,7 +1209,11 @@ async function toggleConfig(mode) {
   const btn = document.getElementById('toggle-' + mode);
   const enabled = !btn.classList.contains('on');
   btn.classList.toggle('on', enabled);
-  const pidParam = selectedPatientId ? `?patient_id=${selectedPatientId}` : '';
+  // FIX : utiliser patientActifId (page patient) en priorité, sinon selectedPatientId (page médecin).
+  // Avant, seul selectedPatientId était lu → null sur la page patient → requête sans patient_id
+  // → le backend visait le mauvais patient → la boîte ne recevait jamais le "remplissage".
+  const pid = patientActifId || selectedPatientId;
+  const pidParam = pid ? `?patient_id=${pid}` : '';
   const res = await api(`/config/${mode}${pidParam}`, { method: 'POST', body: JSON.stringify({ enabled }) });
   if (res) showToast(res.message);
 }
