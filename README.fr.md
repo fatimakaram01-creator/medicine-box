@@ -19,7 +19,6 @@ Pilulier connecté qui suit la prise réelle des médicaments et prédit le meil
 
 <p align="center">
   <img src="assets/box-closed.jpg" width="45%" alt="Medicine Box assemblée, fermée" />
-  <img src="assets/box-open-top.jpg" width="45%" alt="Medicine Box assemblée, vue du dessus" />
 </p>
 
 ## Présentation
