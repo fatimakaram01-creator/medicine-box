@@ -1,3 +1,5 @@
+
+
 # Medicine Box
 
 Pilulier connecté qui suit la prise réelle des médicaments et prédit le meilleur moment de rappel pour chaque patient grâce à des modèles de machine learning individualisés.
@@ -13,8 +15,7 @@ Pilulier connecté qui suit la prise réelle des médicaments et prédit le meil
 
 ## Démo
 
-<!-- Remplacer par le lien réel -->
-[Vidéo de démonstration](#)
+[![Démo](https://img.youtube.com/vi/bXz71IvDXHM/0.jpg)](https://youtu.be/bXz71IvDXHM)
 
 <p align="center">
   <img src="assets/box-closed.jpg" width="45%" alt="Medicine Box assemblée, fermée" />
