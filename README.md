@@ -13,9 +13,7 @@ Smart IoT pill dispenser that tracks real medication intake and predicts the bes
 
 ## Demo
 
-<!-- Replace with actual link -->
-[Demo video](#)
-
+[![Démo](https://img.youtube.com/vi/bXz71IvDXHM/0.jpg)](https://youtu.be/bXz71IvDXHM)
 <p align="center">
   <img src="assets/box-closed.jpg" width="45%" alt="Assembled Medicine Box, closed" />
   <img src="assets/box-open-top.jpg" width="45%" alt="Assembled Medicine Box, top view" />
